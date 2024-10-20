@@ -1,7 +1,15 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { getConfigModuleOptions } from './infrastructure/configs/config-module';
+import { ExchangesModule } from './infrastructure/exchanges/exchanges.module';
+import { BackgroundModule } from './presentation/background/background.module';
 
 @Module({
-	imports: [],
+	imports: [
+		ConfigModule.forRoot(getConfigModuleOptions()),
+		BackgroundModule,
+		ExchangesModule,
+	],
 	controllers: [],
 	providers: [],
 })
