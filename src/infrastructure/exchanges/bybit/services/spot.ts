@@ -50,9 +50,9 @@ export class BybitSpotService {
 			demoTrading: this.isTestMode,
 		});
 
-		// this.wsClient.subscribeV5('order', 'spot');
+		this.wsClient.subscribeV5('order', 'spot');
 
-		// this.configureWsEmits(this.wsClient);
+		this.configureWsEmits(this.wsClient);
 	}
 
 	private configureWsEmits(ws: WebsocketClient) {
