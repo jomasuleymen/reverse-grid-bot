@@ -23,6 +23,10 @@ export class BybitSpotService {
 	) {
 		this.apiKey = this.configService.getOrThrow('bybit.api.key');
 		this.apiSecret = this.configService.getOrThrow('bybit.api.secret');
+		this.tradeConfig.diff =
+			Number(this.configService.get('bybit.spot.diff')) || 20;
+
+		console.log(this.tradeConfig);
 
 		if (!this.apiKey || !this.apiSecret) {
 			throw new Error('Bybit credentials not provided');
@@ -46,9 +50,9 @@ export class BybitSpotService {
 			demoTrading: this.isTestMode,
 		});
 
-		this.wsClient.subscribeV5('order', 'spot');
+		// this.wsClient.subscribeV5('order', 'spot');
 
-		this.configureWsEmits(this.wsClient);
+		// this.configureWsEmits(this.wsClient);
 	}
 
 	private configureWsEmits(ws: WebsocketClient) {
@@ -204,7 +208,9 @@ export class BybitSpotService {
 								orderType: ${order.orderType}`,
 							);
 						} else if (order.orderStatus !== 'Untriggered') {
-							this.telegramService.sendMessage(`order: ${order}`);
+							this.telegramService.sendMessage(
+								`order: ${JSON.stringify(order, null, 2)}`,
+							);
 						}
 					}
 			}
