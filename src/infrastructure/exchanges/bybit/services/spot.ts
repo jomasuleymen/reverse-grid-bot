@@ -49,8 +49,6 @@ export class BybitSpotService {
 		this.wsClient.subscribeV5('order', 'spot');
 
 		this.configureWsEmits(this.wsClient);
-
-		this.init();
 	}
 
 	private configureWsEmits(ws: WebsocketClient) {
@@ -70,10 +68,7 @@ export class BybitSpotService {
 							if (price) price = Number(price);
 							else price = Number(order.avgPrice);
 
-							if (
-								price <= this.tradeConfig.minPrice ||
-								order.side === 'Buy'
-							) {
+							if (order.side === 'Buy') {
 								this.restClient
 									.submitOrder({
 										category: 'spot',
@@ -98,6 +93,69 @@ export class BybitSpotService {
 									.catch((error) => {
 										console.error(error);
 									});
+								if (
+									price - this.tradeConfig.diff <
+									this.tradeConfig.minPrice
+								) {
+									this.restClient
+										.submitOrder({
+											category: 'spot',
+											symbol: 'BTCUSDT',
+											side: 'Buy',
+											orderType: 'Market',
+											qty: order.cumExecQty,
+											marketUnit: 'baseCoin',
+											price: (
+												price - this.tradeConfig.diff
+											).toString(),
+											timeInForce: 'GTC',
+											orderLinkId: `order_${price - this.tradeConfig.diff}_${Date.now()}`,
+											orderFilter: 'StopOrder',
+											triggerPrice: (
+												price - this.tradeConfig.diff
+											).toString(),
+										})
+										.then((response) => {
+											console.log(response);
+										})
+										.catch((error) => {
+											console.error(error);
+										});
+								}
+								if (
+									price + this.tradeConfig.diff >
+									this.tradeConfig.maxPrice
+								) {
+									this.restClient
+										.submitOrder({
+											category: 'spot',
+											symbol: 'BTCUSDT',
+											side: 'Buy',
+											orderType: 'Market',
+											qty: order.cumExecQty,
+											marketUnit: 'baseCoin',
+											price: (
+												price + this.tradeConfig.diff
+											).toString(),
+											timeInForce: 'GTC',
+											orderLinkId: `order_${price + this.tradeConfig.diff}_${Date.now()}`,
+											orderFilter: 'StopOrder',
+											triggerPrice: (
+												price + this.tradeConfig.diff
+											).toString(),
+										})
+										.then((response) => {
+											console.log(response);
+										})
+										.catch((error) => {
+											console.error(error);
+										});
+
+									this.tradeConfig.maxPrice = Math.max(
+										this.tradeConfig.maxPrice,
+										price + this.tradeConfig.diff,
+									);
+								}
 
 								this.tradeConfig.minPrice = Math.min(
 									this.tradeConfig.minPrice,
@@ -105,10 +163,7 @@ export class BybitSpotService {
 								);
 							}
 
-							if (
-								price >= this.tradeConfig.maxPrice ||
-								order.side === 'Sell'
-							) {
+							if (order.side === 'Sell') {
 								this.restClient
 									.submitOrder({
 										category: 'spot',
@@ -159,6 +214,12 @@ export class BybitSpotService {
 			console.log('WS OPENED');
 		});
 
+		ws.on('response', (data) => {
+			if (data?.req_id === 'order') {
+				this.init();
+			}
+		});
+
 		ws.on('reconnect', (data) => {
 			console.log('ws automatically reconnecting.... ', data?.wsKey);
 		});
@@ -181,171 +242,82 @@ export class BybitSpotService {
 
 				console.log('START PRICE: ', startPrice);
 
-				for (let i = 1; i < 2; i++) {
-					const price = startPrice + this.tradeConfig.diff * i;
-					await this.restClient
-						.submitOrder({
-							category: 'spot',
-							symbol: 'BTCUSDT',
-							side: 'Buy',
-							orderType: 'Market',
-							qty: '0.01',
-							marketUnit: 'baseCoin',
-							price: price.toString(),
-							timeInForce: 'GTC',
-							orderLinkId: `order_${price}_${Date.now()}`,
-							orderFilter: 'StopOrder',
-							triggerPrice: price.toString(),
-						})
-						.then((response) => {
-							console.log(response);
-						})
-						.catch((error) => {
-							console.error(error);
-						});
+				this.restClient
+					.submitOrder({
+						category: 'spot',
+						symbol: 'BTCUSDT',
+						side: 'Buy',
+						orderType: 'Market',
+						qty: '0.01',
+						marketUnit: 'baseCoin',
+						timeInForce: 'GTC',
+						orderLinkId: `order_${startPrice}_${Date.now()}`,
+						orderFilter: 'Order',
+					})
+					.then((response) => {
+						console.log(response);
+					})
+					.catch((error) => {
+						console.error(error);
+					});
 
-					this.tradeConfig.maxPrice = Math.max(
-						this.tradeConfig.maxPrice,
-						price,
-					);
-				}
-				for (let i = 1; i < 2; i++) {
-					const price = startPrice - this.tradeConfig.diff * i;
+				// for (let i = 1; i < 2; i++) {
+				// 	const price = startPrice + this.tradeConfig.diff * i;
+				// 	await this.restClient
+				// 		.submitOrder({
+				// 			category: 'spot',
+				// 			symbol: 'BTCUSDT',
+				// 			side: 'Buy',
+				// 			orderType: 'Market',
+				// 			qty: '0.01',
+				// 			marketUnit: 'baseCoin',
+				// 			price: price.toString(),
+				// 			timeInForce: 'GTC',
+				// 			orderLinkId: `order_${price}_${Date.now()}`,
+				// 			orderFilter: 'StopOrder',
+				// 			triggerPrice: price.toString(),
+				// 		})
+				// 		.then((response) => {
+				// 			console.log(response);
+				// 		})
+				// 		.catch((error) => {
+				// 			console.error(error);
+				// 		});
 
-					await this.restClient
-						.submitOrder({
-							category: 'spot',
-							symbol: 'BTCUSDT',
-							side: 'Buy',
-							orderType: 'Market',
-							qty: '0.01',
-							marketUnit: 'baseCoin',
-							price: price.toString(),
-							timeInForce: 'GTC',
-							orderLinkId: `order_${price}_${Date.now()}`,
-							orderFilter: 'StopOrder',
-							triggerPrice: price.toString(),
-						})
-						.then((response) => {
-							console.log(response);
-						})
-						.catch((error) => {
-							console.error(error);
-						});
+				// 	this.tradeConfig.maxPrice = Math.max(
+				// 		this.tradeConfig.maxPrice,
+				// 		price,
+				// 	);
+				// }
+				// for (let i = 1; i < 2; i++) {
+				// 	const price = startPrice - this.tradeConfig.diff * i;
 
-					this.tradeConfig.minPrice = Math.min(
-						this.tradeConfig.minPrice,
-						price,
-					);
-				}
+				// 	await this.restClient
+				// 		.submitOrder({
+				// 			category: 'spot',
+				// 			symbol: 'BTCUSDT',
+				// 			side: 'Buy',
+				// 			orderType: 'Market',
+				// 			qty: '0.01',
+				// 			marketUnit: 'baseCoin',
+				// 			price: price.toString(),
+				// 			timeInForce: 'GTC',
+				// 			orderLinkId: `order_${price}_${Date.now()}`,
+				// 			orderFilter: 'StopOrder',
+				// 			triggerPrice: price.toString(),
+				// 		})
+				// 		.then((response) => {
+				// 			console.log(response);
+				// 		})
+				// 		.catch((error) => {
+				// 			console.error(error);
+				// 		});
+
+				// 	this.tradeConfig.minPrice = Math.min(
+				// 		this.tradeConfig.minPrice,
+				// 		price,
+				// 	);
+				// }
 			});
-	}
-
-	private async createNewOrder() {
-		this.restClient
-			.submitOrder({
-				category: 'spot',
-				symbol: 'BTCUSDT',
-				side: 'Buy',
-				orderType: 'Market',
-				qty: '0.001',
-				marketUnit: 'baseCoin',
-				// price: '15600',
-				timeInForce: 'GTC',
-				// orderLinkId: 'spot-test-gtc-joma ' + Date.now(),
-				isLeverage: 0,
-				orderFilter: 'Order',
-			})
-			.then((response) => {
-				console.log(response);
-			})
-			.catch((error) => {
-				console.error(error);
-			});
-	}
-	private async createNewLimitOrder() {
-		this.restClient
-			.submitOrder({
-				category: 'spot',
-				symbol: 'BTCUSDT',
-				side: 'Buy',
-				orderType: 'Limit',
-				qty: '0.001',
-				marketUnit: 'baseCoin',
-				price: '67500',
-				timeInForce: 'GTC',
-				// orderLinkId: 'spot-test-gtc-joma ' + Date.now(),
-				orderFilter: 'Order',
-
-				slOrderType: 'Limit',
-				stopLoss: '63000',
-				slLimitPrice: '63000',
-			})
-			.then((response) => {
-				console.log(response);
-			})
-			.catch((error) => {
-				console.error(error);
-			});
-	}
-
-	private async createNewStopOrder() {
-		this.restClient
-			.submitOrder({
-				category: 'spot',
-				symbol: 'BTCUSDT',
-				side: 'Buy',
-				orderType: 'Limit',
-				qty: '0.001',
-				marketUnit: 'baseCoin',
-				price: '67670',
-				timeInForce: 'GTC',
-				orderLinkId: Date.now().toString(),
-				orderFilter: 'StopOrder',
-				triggerPrice: '67580',
-			})
-			.then((response) => {
-				console.log(response);
-			})
-			.catch((error) => {
-				console.error(error);
-			});
-	}
-
-	private async createNewTpSlOrder() {
-		this.restClient
-			.submitOrder({
-				category: 'spot',
-				symbol: 'BTCUSDT',
-				side: 'Buy',
-				orderType: 'Limit',
-				qty: '0.001',
-				marketUnit: 'baseCoin',
-				price: '67670',
-				timeInForce: 'PostOnly',
-				orderLinkId: Date.now().toString(),
-				orderFilter: 'StopOrder',
-				triggerPrice: '67580',
-			})
-			.then((response) => {
-				console.log(response);
-			})
-			.catch((error) => {
-				console.error(error);
-			});
-	}
-
-	private async getWalletBalance() {
-		// this.restClient
-		// 	.getWalletBalance({ accountType: 'UNIFIED' })
-		// 	.then((result) => {
-		// 		console.log(
-		// 			'getAccountInfo result: ',
-		// 			JSON.stringify(result, null, 2),
-		// 		);
-		// 	})
-		// 	.catch((err) => {
-		// 		console.error('getAccountInfo error: ', err);
-		// 	});
 	}
 }
