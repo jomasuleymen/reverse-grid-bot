@@ -85,7 +85,7 @@ export class BybitSpotService {
 											price - this.tradeConfig.diff
 										).toString(),
 										timeInForce: 'GTC',
-										orderLinkId: `order_${price - this.tradeConfig.diff}_${Date.now()}`,
+										orderLinkId: `sell_${price - this.tradeConfig.diff}_${Date.now()}`,
 										orderFilter: 'StopOrder',
 										triggerPrice: (
 											price - this.tradeConfig.diff
@@ -113,7 +113,7 @@ export class BybitSpotService {
 												price - this.tradeConfig.diff
 											).toString(),
 											timeInForce: 'GTC',
-											orderLinkId: `order_${price - this.tradeConfig.diff}_${Date.now()}`,
+											orderLinkId: `buy_${price - this.tradeConfig.diff}_${Date.now()}`,
 											orderFilter: 'StopOrder',
 											triggerPrice: (
 												price - this.tradeConfig.diff
@@ -142,7 +142,7 @@ export class BybitSpotService {
 												price + this.tradeConfig.diff
 											).toString(),
 											timeInForce: 'GTC',
-											orderLinkId: `order_${price + this.tradeConfig.diff}_${Date.now()}`,
+											orderLinkId: `buy2_${price + this.tradeConfig.diff}_${Date.now()}`,
 											orderFilter: 'StopOrder',
 											triggerPrice: (
 												price + this.tradeConfig.diff
@@ -180,7 +180,7 @@ export class BybitSpotService {
 											price + this.tradeConfig.diff
 										).toString(),
 										timeInForce: 'GTC',
-										orderLinkId: `order_${price + this.tradeConfig.diff}_${Date.now()}`,
+										orderLinkId: `buy_${price + this.tradeConfig.diff}_${Date.now()}`,
 										orderFilter: 'StopOrder',
 										triggerPrice: (
 											price + this.tradeConfig.diff
@@ -257,7 +257,7 @@ export class BybitSpotService {
 						qty: '0.01',
 						marketUnit: 'baseCoin',
 						timeInForce: 'GTC',
-						orderLinkId: `order_${startPrice}_${Date.now()}`,
+						orderLinkId: `buy_${startPrice}_${Date.now()}`,
 						orderFilter: 'Order',
 					})
 					.then((response) => {
