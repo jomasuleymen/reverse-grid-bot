@@ -36,6 +36,7 @@ export class BybitSpotService {
 			secret: this.apiSecret,
 			demoTrading: this.isTestMode,
 			parseAPIRateLimits: false,
+			recv_window: 30_000,
 		});
 
 		this.wsClient = new WebsocketClient({
@@ -148,7 +149,7 @@ export class BybitSpotService {
 								orderType: ${order.orderType}`,
 							);
 						} else if (order.orderStatus !== 'Untriggered') {
-							this.telegramService.sendMessage(order);
+							this.telegramService.sendMessage(`order: ${order}`);
 						}
 					}
 			}
