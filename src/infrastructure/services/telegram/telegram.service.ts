@@ -10,7 +10,7 @@ export class TelegramService {
 	constructor(private readonly configService: ConfigService) {
 		this.bot = new TelegramBot(
 			this.configService.getOrThrow('telegram.bot.token'),
-			{ polling: false },
+			{ polling: true },
 		);
 	}
 
