@@ -39,6 +39,4 @@ const logger = pino(
 	transports,
 );
 
-logger.info({ asdf: 'SADF' }, 'MESSAGEE');
-
 export default logger;
