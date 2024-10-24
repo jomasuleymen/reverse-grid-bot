@@ -159,7 +159,6 @@ export class BybitSpotAlgo1 {
 					triggerPrice + this.tradeConfig.diff * 2,
 				);
 			}
-			this.updateTradeConfigPrices(triggerPrice);
 		} else if (order.side === 'Sell') {
 			orders.push(
 				this.getTriggerOrderOptions(
@@ -168,7 +167,7 @@ export class BybitSpotAlgo1 {
 					order.cumExecQty,
 				),
 			);
-			// this.updateTradeConfigPrices(triggerPrice + this.tradeConfig.diff);
+			this.updateTradeConfigPrices(triggerPrice + this.tradeConfig.diff);
 		}
 
 		console.log(
