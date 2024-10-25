@@ -154,9 +154,18 @@ export class BybitSpotAlgo1 {
 			});
 
 		let allQuantity = 0;
-		this.orders.forEach(
-			(o) => (allQuantity += o.type === 'buy' ? o.quantity : -o.quantity),
-		);
+
+		await this.restClient
+			.getWalletBalance({ accountType: 'UNIFIED' })
+			.then((res) => {
+				if (res.result.list.length) {
+					const found = res.result.list[0]?.coin.find(
+						(o) => o.coin === 'BTC',
+					);
+
+					if (found) allQuantity = Number(found.walletBalance);
+				}
+			});
 
 		await this.restClient
 			.submitOrder({
