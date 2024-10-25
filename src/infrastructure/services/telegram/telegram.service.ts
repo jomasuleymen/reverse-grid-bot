@@ -14,6 +14,10 @@ export class TelegramService {
 		);
 	}
 
+	getBot() {
+		return this.bot;
+	}
+
 	async sendMessage(text: string): Promise<void> {
 		try {
 			for (const chatId of this.chatIds) {

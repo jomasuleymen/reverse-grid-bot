@@ -10,6 +10,13 @@ import {
 	WebsocketClient,
 } from 'bybit-api';
 
+type Order = {
+	price: number;
+	quantity: number;
+	type: 'buy' | 'sell';
+	fee: number;
+};
+
 @Injectable()
 export class BybitSpotAlgo1 {
 	private readonly apiKey: string;
@@ -29,6 +36,8 @@ export class BybitSpotAlgo1 {
 	};
 
 	private readonly maxAttempts = 3;
+
+	private readonly orders: Order[] = [];
 
 	constructor(
 		private readonly configService: ConfigService,
@@ -72,6 +81,45 @@ export class BybitSpotAlgo1 {
 				console.log('err', err);
 			});
 		this.configureWsEmits();
+
+		this.telegramService.getBot().onText(/\/stop/, async () => {
+			console.log('SDFDSFDSFDSFDSFDSFDSF STOP');
+			await this.restClient
+				.cancelAllOrders({
+					category: 'spot',
+					orderFilter: 'StopOrder',
+				})
+				.then((res) => {
+					console.log(res);
+				});
+			await this.restClient
+				.cancelAllOrders({
+					category: 'spot',
+					orderFilter: 'tpslOrder',
+				})
+				.then((res) => {
+					console.log(res);
+				});
+
+			let allQuantity = 0;
+			this.orders.forEach((o) => (allQuantity += o.quantity));
+
+			await this.restClient
+				.submitOrder({
+					category: 'spot',
+					symbol: 'BTCUSDT',
+					side: 'Sell',
+					orderType: 'Market',
+					qty: allQuantity.toString(),
+					marketUnit: 'baseCoin',
+					timeInForce: 'GTC',
+					orderLinkId: `${'Sell'}_all_${Date.now()}`,
+					orderFilter: 'Order',
+				})
+				.then((res) => {
+					console.log(res);
+				});
+		});
 	}
 
 	private configureWsEmits() {
@@ -136,6 +184,12 @@ export class BybitSpotAlgo1 {
 		const orders: BatchOrderParamsV5[] = [];
 
 		if (order.side === 'Buy') {
+			this.orders.push({
+				price: Number(order.avgPrice),
+				quantity: Number(order.qty),
+				type: 'buy',
+				fee: Number(order.cumExecFee),
+			});
 			orders.push(
 				this.getStopLossOption(
 					triggerPrice - this.tradeConfig.diff,
@@ -160,6 +214,12 @@ export class BybitSpotAlgo1 {
 				);
 			}
 		} else if (order.side === 'Sell') {
+			this.orders.push({
+				price: Number(order.avgPrice),
+				quantity: Number(order.qty),
+				type: 'sell',
+				fee: Number(order.cumExecFee),
+			});
 			orders.push(
 				this.getTriggerOrderOptions(
 					'Buy',
@@ -170,17 +230,77 @@ export class BybitSpotAlgo1 {
 			this.updateTradeConfigPrices(triggerPrice + this.tradeConfig.diff);
 		}
 
-		console.log(
-			'Trigger price: ',
-			triggerPrice,
-			'new place orders: ',
-			orders,
-		);
-
 		if (orders.length) this.submitBatchOrdersWithRetry(orders);
-		this.telegramService.sendMessage(
-			`BYBIT\nSide: ${order.side}\nStatus: ${order.orderStatus}\nLinked Price: ${triggerPrice}\nAvg Price: ${order.avgPrice}\nOrder Type: ${order.orderType}`,
-		);
+
+		const pnl = this.calculatePnL(this.orders, this.tradeConfig.lastPrice);
+		const sellCount = this.orders.filter((o) => o.type === 'sell').length;
+		const buyCount = this.orders.length - sellCount;
+
+		const message = `BYBIT
+		📈 **Информация об ордере**
+		- Сторона: ${order.side}
+		- Триггерная цена: ${triggerPrice}
+		- Покупная цена: ${order.avgPrice}
+		  
+		💰 **Доходность**
+		- Реализованная прибыль: ${pnl.realizedPnl.toFixed(2)}
+		- Нереализованная прибыль: ${pnl.unrealizedPnl.toFixed(2)}
+		- Прибыль: ${(pnl.unrealizedPnl - pnl.realizedPnl).toFixed(2)}
+		
+		📊 **Текущая торговая статистика**
+		- Текущая цена: ${this.tradeConfig.lastPrice.toFixed(2)}
+		- Общая купленная сумма: ${pnl.totalBoughtQuantity}
+		- Общая проданная сумма: ${pnl.totalSoldQuantity}
+		- Средняя цена покупки: ${pnl.averageBuyPrice}
+		- Остаток количества: ${pnl.remainingQuantity}
+		- Общая стоимость покупок: ${pnl.totalBoughtValue}
+		- Общая выручка от продаж: ${pnl.totalSellRevenue}
+		  
+		🔄 **Общее количество операций**
+		- Покупки: ${buyCount}
+		- Продажи: ${sellCount}`;
+
+		this.telegramService.sendMessage(message);
+	}
+
+	private calculatePnL(orders: Order[], lastPrice: number) {
+		let totalBoughtQuantity = 0;
+		let totalBoughtValue = 0;
+		let totalSellRevenue = 0;
+		let totalSoldQuantity = 0;
+		let totalFees = 0; // New variable to track total fees
+
+		for (const order of orders) {
+			if (order.type === 'buy') {
+				totalBoughtQuantity += order.quantity;
+				totalBoughtValue += order.price * order.quantity;
+				totalFees += order.fee; // Add fees to total
+			} else if (order.type === 'sell') {
+				totalSellRevenue += order.price * order.quantity;
+				totalSoldQuantity += order.quantity;
+				totalFees += order.fee; // Add fees to total
+			}
+		}
+
+		const averageBuyPrice =
+			totalBoughtQuantity > 0
+				? totalBoughtValue / totalBoughtQuantity
+				: 0;
+		const realizedPnl =
+			totalSellRevenue - averageBuyPrice * totalSoldQuantity - totalFees;
+		const remainingQuantity = totalBoughtQuantity - totalSoldQuantity;
+		const unrealizedPnl = remainingQuantity * (lastPrice - averageBuyPrice); // Calculate unrealized PNL using lastPrice
+
+		return {
+			realizedPnl,
+			unrealizedPnl,
+			totalBoughtQuantity,
+			totalSoldQuantity,
+			totalBoughtValue,
+			totalSellRevenue,
+			remainingQuantity,
+			averageBuyPrice,
+		};
 	}
 
 	// Unified method to create both Buy and Sell orders
