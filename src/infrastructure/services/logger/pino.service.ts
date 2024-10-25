@@ -1,42 +1,51 @@
+import fs from 'fs';
 import path from 'path';
 import pino from 'pino';
 
 const logDir = path.resolve('logs');
 
+if (!fs.existsSync(logDir)) {
+	fs.mkdirSync(logDir);
+}
+
 const transports = pino.transport({
 	targets: [
 		{
 			level: 'info',
-			target: 'pino-pretty',
+			target: 'pino/file',
 			options: { destination: path.join(logDir, 'info.log') },
 		},
 		{
 			level: 'warn',
-			target: 'pino-pretty',
+			target: 'pino/file',
 			options: { destination: path.join(logDir, 'warn.log') },
 		},
 		{
 			level: 'error',
-			target: 'pino-pretty',
+			target: 'pino/file',
 			options: { destination: path.join(logDir, 'error.log') },
 		},
 		{
 			level: 'fatal',
-			target: 'pino-pretty',
+			target: 'pino/file',
 			options: { destination: path.join(logDir, 'fatal.log') },
 		},
 	],
 });
 
-const logger = pino(
+const pinoLogger = pino(
 	{
 		formatters: {
 			bindings: (obj) => {
 				return {};
 			},
 		},
+		nestedKey: 'content',
+		timestamp: pino.stdTimeFunctions.isoTime,
 	},
 	transports,
 );
 
-export default logger;
+pinoLogger.useLevelLabels = true;
+
+export default pinoLogger;

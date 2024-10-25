@@ -1,4 +1,4 @@
-import logger from '@/infrastructure/services/logger/pino.service';
+import pinoLogger from '@/infrastructure/services/logger/pino.service';
 import { TelegramService } from '@/infrastructure/services/telegram/telegram.service';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -9,6 +9,7 @@ import {
 	RestClientV5,
 	WebsocketClient,
 } from 'bybit-api';
+import sleep from 'sleep-promise';
 
 type Order = {
 	price: number;
@@ -26,14 +27,10 @@ export class BybitSpotAlgo1 {
 	private readonly wsClient: WebsocketClient;
 	private readonly publicWsClient: WebsocketClient;
 
-	private readonly tradeConfig = {
-		startPrice: 0,
-		diff: 50,
-		directionOrdersCount: 3,
-		lastPrice: 0,
-		maxPrice: 0,
-		minPrice: 100_000_000,
-	};
+	private tradingSummaries: string[] = [];
+
+	private tradeConfig;
+	private isRunning = true;
 
 	private readonly maxAttempts = 3;
 
@@ -46,6 +43,8 @@ export class BybitSpotAlgo1 {
 	) {
 		this.apiKey = this.configService.getOrThrow('bybit.api.key');
 		this.apiSecret = this.configService.getOrThrow('bybit.api.secret');
+		this.tradeConfig = this.getTradeConfig();
+
 		this.tradeConfig.diff =
 			Number(this.configService.get('bybit.spot.diff')) || 50;
 
@@ -71,6 +70,8 @@ export class BybitSpotAlgo1 {
 			market: 'v5',
 		});
 
+		this.sendSummary();
+
 		this.wsClient.subscribeV5('order', 'spot');
 		this.publicWsClient
 			.subscribeV5('tickers.BTCUSDT', 'spot')
@@ -83,43 +84,101 @@ export class BybitSpotAlgo1 {
 		this.configureWsEmits();
 
 		this.telegramService.getBot().onText(/\/stop/, async () => {
-			console.log('SDFDSFDSFDSFDSFDSFDSF STOP');
-			await this.restClient
-				.cancelAllOrders({
-					category: 'spot',
-					orderFilter: 'StopOrder',
-				})
-				.then((res) => {
-					console.log(res);
-				});
-			await this.restClient
-				.cancelAllOrders({
-					category: 'spot',
-					orderFilter: 'tpslOrder',
-				})
-				.then((res) => {
-					console.log(res);
-				});
-
-			let allQuantity = 0;
-			this.orders.forEach((o) => (allQuantity += o.quantity));
-
-			await this.restClient
-				.submitOrder({
-					category: 'spot',
-					symbol: 'BTCUSDT',
-					side: 'Sell',
-					orderType: 'Market',
-					qty: allQuantity.toString(),
-					marketUnit: 'baseCoin',
-					timeInForce: 'GTC',
-					orderLinkId: `${'Sell'}_all_${Date.now()}`,
-					orderFilter: 'Order',
-				})
-				.then((res) => {
-					console.log(res);
-				});
+			await this.stopProcess();
 		});
+	}
+
+	private sendSummary() {
+		this.restClient
+			.getWalletBalance({ accountType: 'UNIFIED' })
+			.then((res) => {
+				pinoLogger.info(res);
+				const summary = res.result.list
+					.map((item) => {
+						const coin = item.coin
+							.map(
+								(c) =>
+									`\tМонета: ${c.coin}\n` +
+									`\tБаланс: ${c.walletBalance} ${c.coin}`,
+							)
+							.join('\n\t-----------\n');
+
+						return (
+							`Счёт: ${item.accountType}\n` +
+							`Всего активов: ${item.totalEquity} USD\n` +
+							`Доступный баланс: ${item.totalAvailableBalance} USD\n` +
+							`${coin}`
+						);
+					})
+					.join('\n\n');
+
+				this.tradingSummaries.push(summary);
+				this.telegramService.sendMessage(
+					this.tradingSummaries.join('\n\n'),
+				);
+			});
+	}
+
+	private getTradeConfig() {
+		return {
+			startPrice: 0,
+			diff: 50,
+			directionOrdersCount: 3,
+			cancelOnBuyCount: 20,
+			lastPrice: 0,
+			maxPrice: 0,
+			minPrice: 100_000_000,
+		};
+	}
+
+	private async stopProcess() {
+		this.isRunning = false;
+		const job = this.schedulerRegistry.getCronJob('check_bottom_price');
+		job.stop();
+
+		this.restClient
+			.cancelAllOrders({
+				category: 'spot',
+				orderFilter: 'StopOrder',
+			})
+			.then((res) => {
+				console.log(res);
+			});
+		await this.restClient
+			.cancelAllOrders({
+				category: 'spot',
+				orderFilter: 'tpslOrder',
+			})
+			.then((res) => {
+				console.log(res);
+			});
+
+		let allQuantity = 0;
+		this.orders.forEach(
+			(o) => (allQuantity += o.type === 'buy' ? o.quantity : -o.quantity),
+		);
+
+		await this.restClient
+			.submitOrder({
+				category: 'spot',
+				symbol: 'BTCUSDT',
+				side: 'Sell',
+				orderType: 'Market',
+				qty: allQuantity.toString(),
+				marketUnit: 'baseCoin',
+				timeInForce: 'GTC',
+				orderLinkId: `${'Sell'}_all_${Date.now()}`,
+				orderFilter: 'Order',
+			})
+			.then((res) => {
+				console.log(res);
+			});
+
+		// this.tradeConfig = this.getTradeConfig();
+
+		this.telegramService.sendMessage('Успешно процесс остановился');
+		await sleep(1000);
+		this.sendSummary();
 	}
 
 	private configureWsEmits() {
@@ -178,6 +237,8 @@ export class BybitSpotAlgo1 {
 	}
 
 	private handleFilledOrder(order: any) {
+		if (!this.isRunning) return;
+
 		const triggerPrice = this.getTriggerPrice(order);
 		if (!triggerPrice) return;
 
@@ -230,76 +291,75 @@ export class BybitSpotAlgo1 {
 			this.updateTradeConfigPrices(triggerPrice + this.tradeConfig.diff);
 		}
 
-		if (orders.length) this.submitBatchOrdersWithRetry(orders);
-
-		const pnl = this.calculatePnL(this.orders, this.tradeConfig.lastPrice);
+		this.submitBatchOrdersWithRetry(orders);
 		const sellCount = this.orders.filter((o) => o.type === 'sell').length;
 		const buyCount = this.orders.length - sellCount;
+		// if (buyCount - sellCount >= this.tradeConfig.cancelOnBuyCount) {
+		// 	this.stopProcess();
+		// } else if (orders.length) {
+		const pnl = this.calculatePnL(this.orders, this.tradeConfig.lastPrice);
 
 		const message = `BYBIT
-		📈 **Информация об ордере**
-		- Сторона: ${order.side}
-		- Триггерная цена: ${triggerPrice}
-		- Покупная цена: ${order.avgPrice}
-		  
-		💰 **Доходность**
-		- Реализованная прибыль: ${pnl.realizedPnl.toFixed(2)}
-		- Нереализованная прибыль: ${pnl.unrealizedPnl.toFixed(2)}
-		- Прибыль: ${(pnl.unrealizedPnl - pnl.realizedPnl).toFixed(2)}
-		
-		📊 **Текущая торговая статистика**
-		- Текущая цена: ${this.tradeConfig.lastPrice.toFixed(2)}
-		- Общая купленная сумма: ${pnl.totalBoughtQuantity}
-		- Общая проданная сумма: ${pnl.totalSoldQuantity}
-		- Средняя цена покупки: ${pnl.averageBuyPrice}
-		- Остаток количества: ${pnl.remainingQuantity}
-		- Общая стоимость покупок: ${pnl.totalBoughtValue}
-		- Общая выручка от продаж: ${pnl.totalSellRevenue}
-		  
-		🔄 **Общее количество операций**
-		- Покупки: ${buyCount}
-		- Продажи: ${sellCount}`;
+			📈 **Информация об ордере**
+			- Сторона: ${order.side}
+			- Триггерная цена: ${triggerPrice}
+			- Покупная цена: ${order.avgPrice}
+			  
+			💰 **Доходность**
+			- Реализованная прибыль: ${pnl.realizedPnL.toFixed(2)}
+			- Нереализованная прибыль: ${pnl.unrealizedPnL.toFixed(2)}
+			- Прибыль: ${(pnl.unrealizedPnL + pnl.realizedPnL).toFixed(2)}
+			
+			📊 **Текущая торговая статистика**
+			- Текущая цена: ${this.tradeConfig.lastPrice.toFixed(2)}
+			  
+			🔄 **Общее количество операций**
+			- Покупки: ${buyCount}
+			- Продажи: ${sellCount}`;
 
 		this.telegramService.sendMessage(message);
+
+		// }
 	}
 
-	private calculatePnL(orders: Order[], lastPrice: number) {
-		let totalBoughtQuantity = 0;
-		let totalBoughtValue = 0;
-		let totalSellRevenue = 0;
-		let totalSoldQuantity = 0;
-		let totalFees = 0; // New variable to track total fees
+	private calculatePnL(orders: Order[], currentPrice: number) {
+		const buyStack: Order[] = []; // Stack to track buy orders for stop-losses
+		let realizedPnL = 0;
 
-		for (const order of orders) {
+		orders.forEach((order) => {
 			if (order.type === 'buy') {
-				totalBoughtQuantity += order.quantity;
-				totalBoughtValue += order.price * order.quantity;
-				totalFees += order.fee; // Add fees to total
-			} else if (order.type === 'sell') {
-				totalSellRevenue += order.price * order.quantity;
-				totalSoldQuantity += order.quantity;
-				totalFees += order.fee; // Add fees to total
+				// Push the buy order onto the stack
+				buyStack.push(order);
+			} else if (order.type === 'sell' && buyStack.length > 0) {
+				// Pop the latest buy order from the stack for each sell
+				const lastBuy = buyStack.pop();
+				if (lastBuy) {
+					console.log(
+						'TRIGGER',
+						lastBuy.price,
+						order.price,
+						order.price - lastBuy.price,
+						lastBuy.quantity,
+						order.quantity,
+					);
+					// Calculate realized P&L for this sell using the latest buy price
+					const sellPnL =
+						(order.price - lastBuy.price) * order.quantity;
+					realizedPnL += sellPnL;
+				}
 			}
-		}
 
-		const averageBuyPrice =
-			totalBoughtQuantity > 0
-				? totalBoughtValue / totalBoughtQuantity
-				: 0;
-		const realizedPnl =
-			totalSellRevenue - averageBuyPrice * totalSoldQuantity - totalFees;
-		const remainingQuantity = totalBoughtQuantity - totalSoldQuantity;
-		const unrealizedPnl = remainingQuantity * (lastPrice - averageBuyPrice); // Calculate unrealized PNL using lastPrice
+			realizedPnL -= order.fee;
+		});
+
+		// Calculate unrealized P&L for remaining holdings based on the current market price
+		const unrealizedPnL = buyStack.reduce((total, buyOrder) => {
+			return total + (currentPrice - buyOrder.price) * buyOrder.quantity;
+		}, 0);
 
 		return {
-			realizedPnl,
-			unrealizedPnl,
-			totalBoughtQuantity,
-			totalSoldQuantity,
-			totalBoughtValue,
-			totalSellRevenue,
-			remainingQuantity,
-			averageBuyPrice,
+			realizedPnL,
+			unrealizedPnL,
 		};
 	}
 
@@ -382,7 +442,7 @@ export class BybitSpotAlgo1 {
 					'spot' as any,
 					ordersParams,
 				);
-				logger.info(response);
+				pinoLogger.info(response);
 
 				if (response.retCode === 0) {
 					// const notPlacedOrders = response.result.list.filter(
@@ -432,7 +492,7 @@ export class BybitSpotAlgo1 {
 		this.tradeConfig.minPrice = startPrice;
 		this.tradeConfig.maxPrice = startPrice;
 
-		const qty = '0.002';
+		const qty = '0.01';
 
 		let orders: BatchOrderParamsV5[] = [
 			{
@@ -478,7 +538,7 @@ export class BybitSpotAlgo1 {
 				this.getTriggerOrderOptions(
 					'Buy',
 					this.tradeConfig.minPrice - this.tradeConfig.diff,
-					'0.002',
+					'0.01',
 				),
 			);
 
