@@ -6,7 +6,7 @@ import { ExchangesModule } from './infrastructure/exchanges/exchanges.module';
 import { CustomLoggerModule } from './infrastructure/services/logger/logger.module';
 import { TelegramModule } from './infrastructure/services/telegram/telegram.module';
 import { PresentationModule } from './presentation/presentation.module';
-import { TradeBotsModules } from './infrastructure/trade-bots/trade-bots.module';
+import { TradingBotsModules } from './infrastructure/trading-bots/trade-bots.module';
 
 @Module({
 	imports: [
@@ -14,7 +14,7 @@ import { TradeBotsModules } from './infrastructure/trade-bots/trade-bots.module'
 		ScheduleModule.forRoot(),
 		PresentationModule,
 		ExchangesModule,
-		TradeBotsModules,
+		TradingBotsModules,
 
 		TelegramModule,
 		CustomLoggerModule,

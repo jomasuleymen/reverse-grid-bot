@@ -12,4 +12,4 @@ const botProviders: Provider[] = [
 	providers: [...botProviders],
 	exports: [...botProviders],
 })
-export class TradeBotsModules {}
+export class TradingBotsModules {}
