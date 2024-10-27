@@ -1,4 +1,4 @@
-import pinoLogger from '@/infrastructure/services/logger/pino.service';
+import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { TelegramService } from '@/infrastructure/services/telegram/telegram.service';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -19,10 +19,10 @@ type Order = {
 };
 
 @Injectable()
-export class BybitSpotAlgo1 {
+export class BybitSpotReverseGridBot {
 	private readonly apiKey: string;
 	private readonly apiSecret: string;
-	private readonly isTestMode: boolean;
+	private readonly isDemoTrading: boolean;
 	private readonly restClient: RestClientV5;
 	private readonly wsClient: WebsocketClient;
 	private readonly publicWsClient: WebsocketClient;
@@ -40,6 +40,7 @@ export class BybitSpotAlgo1 {
 		private readonly configService: ConfigService,
 		private readonly telegramService: TelegramService,
 		private readonly schedulerRegistry: SchedulerRegistry,
+		private readonly loggerService: LoggerService,
 	) {
 		this.apiKey = this.configService.getOrThrow('bybit.api.key');
 		this.apiSecret = this.configService.getOrThrow('bybit.api.secret');
@@ -48,13 +49,12 @@ export class BybitSpotAlgo1 {
 		this.tradeConfig.diff =
 			Number(this.configService.get('bybit.spot.diff')) || 50;
 
-		this.isTestMode =
-			this.configService.getOrThrow('environment') !== 'production';
+		this.isDemoTrading = this.configService.getOrThrow('bybit.isDemoTrading');
 
 		this.restClient = new RestClientV5({
 			key: this.apiKey,
 			secret: this.apiSecret,
-			demoTrading: this.isTestMode,
+			demoTrading: this.isDemoTrading,
 			parseAPIRateLimits: false,
 			recv_window: 10_000,
 		});
@@ -63,36 +63,36 @@ export class BybitSpotAlgo1 {
 			key: this.apiKey,
 			secret: this.apiSecret,
 			market: 'v5',
-			demoTrading: this.isTestMode,
+			demoTrading: this.isDemoTrading,
 		});
 
 		this.publicWsClient = new WebsocketClient({
 			market: 'v5',
 		});
 
-		this.sendSummary();
+		// this.sendSummary();
 
-		this.wsClient.subscribeV5('order', 'spot');
-		this.publicWsClient
-			.subscribeV5('tickers.BTCUSDT', 'spot')
-			.then((res) => {
-				console.log('res', res);
-			})
-			.catch((err) => {
-				console.log('err', err);
-			});
-		this.configureWsEmits();
+		// this.wsClient.subscribeV5('order', 'spot');
+		// this.publicWsClient
+		// 	.subscribeV5('tickers.BTCUSDT', 'spot')
+		// 	.then((res) => {
+		// 		console.log('res', res);
+		// 	})
+		// 	.catch((err) => {
+		// 		console.log('err', err);
+		// 	});
+		// this.configureWsEmits();
 
-		this.telegramService.getBot().onText(/\/stop/, async () => {
-			await this.stopProcess();
-		});
+		// this.telegramService.getBot().onText(/\/stop/, async () => {
+		// 	await this.stopProcess();
+		// });
 	}
 
 	private sendSummary() {
 		this.restClient
 			.getWalletBalance({ accountType: 'UNIFIED' })
 			.then((res) => {
-				pinoLogger.info(res);
+				// pinoLogger.info(res);
 				const summary = res.result.list
 					.map((item) => {
 						const coin = item.coin
@@ -103,12 +103,7 @@ export class BybitSpotAlgo1 {
 							)
 							.join('\n\t-----------\n');
 
-						return (
-							`Счёт: ${item.accountType}\n` +
-							`Всего активов: ${item.totalEquity} USD\n` +
-							`Доступный баланс: ${item.totalAvailableBalance} USD\n` +
-							`${coin}`
-						);
+						return `Счёт: ${item.accountType}\n` + `${coin}`;
 					})
 					.join('\n\n');
 
@@ -451,7 +446,7 @@ export class BybitSpotAlgo1 {
 					'spot' as any,
 					ordersParams,
 				);
-				pinoLogger.info(response);
+				// pinoLogger.info(response);
 
 				if (response.retCode === 0) {
 					// const notPlacedOrders = response.result.list.filter(

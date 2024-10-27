@@ -56,7 +56,7 @@
 			"@/*": ["src/*"]
 		}
 	},
-	"include": ["src/**/*.ts", "src/**/*.js", "test/**/*.ts", "test/**/*.js"],
+	"include": ["./*.d.ts", "src/**/*.ts", "src/**/*.js", "test/**/*.ts", "test/**/*.js"],
 	"exclude": ["node_modules/**", "dist", "build"],
 	"ts-node": {
 		"require": ["tsconfig-paths/register"]

@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
-import { BinanceFuturesService } from './services/futures';
 
 @Module({
 	imports: [],
-	providers: [BinanceFuturesService],
-	exports: [BinanceFuturesService],
+	providers: [],
+	exports: [],
 })
 export class BinanceModule {}

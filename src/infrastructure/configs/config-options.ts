@@ -39,7 +39,7 @@ export const getConfigModuleOptions = (): ConfigModuleOptions => {
 		isGlobal: true,
 		validationSchema: Joi.object({
 			NODE_ENV: Joi.string()
-				.valid('development', 'production', 'test')
+				.valid('development', 'production')
 				.default(DEFAULT_ENV)
 				.required(),
 		}),

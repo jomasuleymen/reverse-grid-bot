@@ -9,10 +9,10 @@ import {
 } from 'binance';
 
 @Injectable()
-export class BinanceFuturesService {
+export class BinanceFuturesReverseGridBot {
 	private readonly apiKey: string;
 	private readonly apiSecret: string;
-	private readonly isTestMode: boolean;
+	private readonly isTestNet: boolean;
 	private readonly restUsdmClient: USDMClient;
 	private readonly wsClient: WebsocketClient;
 
@@ -28,8 +28,7 @@ export class BinanceFuturesService {
 			throw new Error('Binance credentials not provided');
 		}
 
-		this.isTestMode =
-			this.configService.getOrThrow('environment') !== 'production';
+		this.isTestNet = this.configService.getOrThrow('binance.isTestnet');
 
 		this.restUsdmClient = new USDMClient(
 			{
@@ -38,7 +37,7 @@ export class BinanceFuturesService {
 				recvWindow: 10_000,
 			},
 			{},
-			this.isTestMode,
+			this.isTestNet,
 		);
 
 		const testWslUrl = 'wss://stream.binancefuture.com';
@@ -46,7 +45,7 @@ export class BinanceFuturesService {
 			api_key: this.apiKey,
 			api_secret: this.apiSecret,
 			beautify: true,
-			wsUrl: this.isTestMode ? testWslUrl : undefined,
+			wsUrl: this.isTestNet ? testWslUrl : undefined,
 		});
 
 		// this.configureWsEmits(this.wsClient);
