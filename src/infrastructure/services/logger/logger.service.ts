@@ -28,7 +28,7 @@ class LoggerService {
 		this.log('fatal', message, obj);
 	}
 
-	private log(level: Level, message: string, obj?: object) {
+	private async log(level: Level, message: string, obj?: object) {
 		this.pinoLogger[level](obj, message);
 	}
 
@@ -40,7 +40,6 @@ class LoggerService {
 			{
 				formatters: { bindings: () => ({}) },
 				nestedKey: 'content',
-				errorKey: 'error',
 				timestamp: pino.stdTimeFunctions.isoTime,
 			},
 			transport,
@@ -82,6 +81,7 @@ class LoggerService {
 				target: 'pino-pretty',
 				options: {
 					destination: path.join(logDir, `${level}.log`),
+					translateTime: 'SYS:yyyy-mm-dd HH:MM:ss o',
 					colorize: true,
 					sync: false,
 				},
@@ -101,7 +101,6 @@ class LoggerService {
 			options: {
 				token,
 				dataset,
-				sync: false,
 			},
 		});
 	}

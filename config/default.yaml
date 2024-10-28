@@ -13,7 +13,7 @@ bybit:
 telegram:
     bot:
         token: 
-    allowed-user-ids:
+    allowedUserIds:
         - 
 
 logger:

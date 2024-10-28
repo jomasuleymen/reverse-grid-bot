@@ -13,6 +13,6 @@ export class TelegramBotCommandsModule implements OnModuleInit {
 			new StartTradingCommand(),
 			new StopTradingCommand(),
 		];
-		await this.telegramService.setCommands(commands);
+		this.telegramService.setCommands(commands);
 	}
 }

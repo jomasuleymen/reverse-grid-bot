@@ -24,25 +24,25 @@ export class TradingUtils {
 
 	constructor(private readonly klineRepo: KLineRepo) {
 		this.restClient = new RestClientV5({ parseAPIRateLimits: true });
-		this.restClient
-			.getKline({
-				category: 'spot',
-				symbol: 'BTCUSDT',
-				interval: '1',
-			})
-			.then((res) => {
-				console.log(res);
-				console.log(res.result.list);
-			});
-		this.calculatePnL({
-			category: 'spot',
-			symbol: 'BTCUSDT',
-			interval: '1',
-			start: 1670608800000,
-			end: 1670605200000,
-		}).then((res) => {
-			console.log('RESULT', res);
-		});
+		// this.restClient
+		// 	.getKline({
+		// 		category: 'spot',
+		// 		symbol: 'BTCUSDT',
+		// 		interval: '1',
+		// 	})
+		// 	.then((res) => {
+		// 		console.log(res);
+		// 		console.log(res.result.list);
+		// 	});
+		// this.calculatePnL({
+		// 	category: 'spot',
+		// 	symbol: 'BTCUSDT',
+		// 	interval: '1',
+		// 	start: 1670608800000,
+		// 	end: 1670605200000,
+		// }).then((res) => {
+		// 	console.log('RESULT', res);
+		// });
 	}
 
 	public async calculatePnL(payload: {

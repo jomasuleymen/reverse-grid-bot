@@ -16,6 +16,14 @@ export class TelegramService {
 		const botToken = this.configService.get<string>('telegram.bot.token');
 		this.allowedUserIds = new Set(this.getAllowedUserIds());
 
+		if (this.allowedUserIds.size) {
+			this.logger.info(
+				`Telegram bot - allowed user ids: ${Array.from(this.allowedUserIds)}`,
+			);
+		} else {
+			this.logger.warn('Telegram bot has not allowed users');
+		}
+
 		if (botToken) {
 			this.bot = new TelegramBot(botToken, { polling: true });
 			this.handleErrors();
@@ -25,8 +33,9 @@ export class TelegramService {
 	}
 
 	private getAllowedUserIds(): number[] {
-		const chatIds =
-			this.configService.get<(string | number)[]>('allowed-user-ids');
+		const chatIds = this.configService.get<(string | number)[]>(
+			'telegram.allowedUserIds',
+		);
 		return Array.isArray(chatIds)
 			? chatIds.map(Number).filter(Number.isInteger)
 			: [];
@@ -58,18 +67,22 @@ export class TelegramService {
 		if (!this.bot) return;
 
 		for (const command of commands) {
-			this.bot.onText(new RegExp(`^${command.command}$`), (msg) => {
+			this.bot.onText(new RegExp(`^/${command.command}$`), (msg) => {
 				const chatId = msg.chat.id;
 				const userId = msg.from?.id;
 
-				if (!userId || !this.allowedUserIds.has(userId)) {
-					this.bot!.sendMessage(chatId, 'Access denied.');
+				if (!this.checkIsUserAllowed(userId)) {
+					this.bot!.sendMessage(chatId, `Доступ запрещен. ${userId}`);
 					return;
 				}
 
 				command.exec(msg, this.bot!);
 			});
 		}
+	}
+
+	private checkIsUserAllowed(userId: any) {
+		return userId && this.allowedUserIds.has(userId);
 	}
 
 	private async updateBotCommands(commands: IBotCommand[]): Promise<void> {
@@ -81,11 +94,24 @@ export class TelegramService {
 		}));
 
 		try {
-			const result = await this.bot.setMyCommands(botCommands);
-			if (result) {
-				this.logger.debug('Telegram commands set successfully');
+			// Retrieve existing bot commands
+			const alreadyHasCommands = await this.bot.getMyCommands();
+
+			// Check if there's any difference between the existing and new commands
+			const commandsAreDifferent =
+				JSON.stringify(alreadyHasCommands) !==
+				JSON.stringify(botCommands);
+
+			// Update commands only if there’s a difference
+			if (commandsAreDifferent) {
+				const result = await this.bot.setMyCommands(botCommands);
+				if (result) {
+					this.logger.info('Telegram commands set successfully');
+				} else {
+					this.logger.error('Failed to set Telegram commands');
+				}
 			} else {
-				this.logger.error('Failed to set Telegram commands');
+				this.logger.info('No updates needed for Telegram commands');
 			}
 		} catch (error) {
 			this.logger.error('Error setting Telegram commands', { error });
