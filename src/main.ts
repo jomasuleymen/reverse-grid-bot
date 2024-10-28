@@ -5,7 +5,7 @@ async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 	await app.init();
 
-	console.log('STARTED');
+	console.log('APP STARTED');
 }
 
 bootstrap();

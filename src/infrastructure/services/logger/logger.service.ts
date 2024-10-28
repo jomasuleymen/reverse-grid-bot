@@ -2,74 +2,72 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import fs from 'fs';
 import path from 'path';
-import pino, { DestinationStream, Logger } from 'pino';
+import pino, { DestinationStream, Level, Logger } from 'pino';
 
 @Injectable()
 class LoggerService {
 	private readonly pinoLogger: Logger;
 
 	constructor(private readonly configService: ConfigService) {
-		const loggerType = this.configService.getOrThrow('logger.type');
-		this.pinoLogger = this.getPinoLogger(loggerType);
+		this.pinoLogger = this.createLogger();
 	}
 
 	debug(message: string, obj?: object) {
-		this.pinoLogger.debug(obj, message);
+		this.log('debug', message, obj);
 	}
 	info(message: string, obj?: object) {
-		this.pinoLogger.info(obj, message);
+		this.log('info', message, obj);
 	}
 	warn(message: string, obj?: object) {
-		this.pinoLogger.warn(obj, message);
+		this.log('warn', message, obj);
 	}
 	error(message: string, obj?: object) {
-		this.pinoLogger.error(obj, message);
+		this.log('error', message, obj);
 	}
 	fatal(message: string, obj?: object) {
-		this.pinoLogger.fatal(obj, message);
+		this.log('fatal', message, obj);
 	}
 
-	private getPinoLogger(transportType: 'local' | 'axiom') {
-		let transport: DestinationStream;
+	private log(level: Level, message: string, obj?: object) {
+		this.pinoLogger[level](obj, message);
+	}
 
-		if (transportType === 'local') transport = this.getFileTransport();
-		else if (transportType === 'axiom') {
-			const token = this.configService.getOrThrow('logger.axiom.token');
-			const dataSet = this.configService.getOrThrow(
-				'logger.axiom.dataset',
-			);
-
-			transport = this.getAxiomTransport(token, dataSet);
-		} else {
-			throw new Error("Logger type should be either 'local' or 'axiom'");
-		}
+	private createLogger(): Logger {
+		const loggerType = this.configService.getOrThrow('logger.type');
+		const transport = this.getTransport(loggerType);
 
 		const pinoLogger = pino(
 			{
-				formatters: {
-					bindings: (obj) => {
-						return {};
-					},
-				},
+				formatters: { bindings: () => ({}) },
 				nestedKey: 'content',
+				errorKey: 'error',
 				timestamp: pino.stdTimeFunctions.isoTime,
 			},
 			transport,
 		);
 
 		pinoLogger.useLevelLabels = true;
-
 		return pinoLogger;
 	}
 
-	private getFileTransport() {
-		const logDir = path.resolve('logs');
-
-		if (!fs.existsSync(logDir)) {
-			fs.mkdirSync(logDir);
+	private getTransport(type: 'local' | 'axiom'): DestinationStream {
+		switch (type) {
+			case 'local':
+				return this.createFileTransport();
+			case 'axiom':
+				return this.createAxiomTransport();
+			default:
+				throw new Error(
+					"Logger type should be either 'local' or 'axiom'",
+				);
 		}
+	}
 
-		const levels: pino.Level[] = [
+	private createFileTransport(): DestinationStream {
+		const logDir = path.resolve('logs');
+		if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
+
+		const levels: Level[] = [
 			'info',
 			'trace',
 			'warn',
@@ -91,12 +89,18 @@ class LoggerService {
 		});
 	}
 
-	private getAxiomTransport(token: string, dataset: string) {
+	private createAxiomTransport(): DestinationStream {
+		const token =
+			this.configService.getOrThrow<string>('logger.axiom.token');
+		const dataset = this.configService.getOrThrow<string>(
+			'logger.axiom.dataset',
+		);
+
 		return pino.transport({
 			target: '@axiomhq/pino',
 			options: {
-				token: token,
-				dataset: dataset,
+				token,
+				dataset,
 				sync: false,
 			},
 		});

@@ -1,6 +1,25 @@
-environment: development
-
 binance:
+    isTestnet: true
     api:
-        key:
-        secret:
+        key: 
+        secret: 
+
+bybit:
+    isDemoTrading: true
+    api:
+        key: 
+        secret: 
+
+telegram:
+    bot:
+        token: 
+    allowed-user-ids:
+        - 
+
+logger:
+    type: local # local | axiom
+
+    # if selected type axiom
+    axiom:
+        token: 
+        dataset: 

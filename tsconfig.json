@@ -26,6 +26,7 @@
 
 		/* Strict Type-Checking Options */
 		"strict": true,
+		"strictPropertyInitialization": false,
 		"noImplicitAny": true,
 		"strictBindCallApply": true,
 		"strictFunctionTypes": true,

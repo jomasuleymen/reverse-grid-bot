@@ -2,102 +2,108 @@ import { IBotCommand } from '@/domain/adapters/telegram.interface';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import TelegramBot from 'node-telegram-bot-api';
-import sleep from 'sleep-promise';
 import LoggerService from '../logger/logger.service';
 
 @Injectable()
 export class TelegramService {
-	private readonly chatIds: number[] = [];
 	private readonly bot?: TelegramBot;
+	private readonly allowedUserIds: Set<number>;
 
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly logger: LoggerService,
 	) {
-		const botToken = this.configService.get('telegram.bot.token');
-		this.chatIds = this.getChatIds();
+		const botToken = this.configService.get<string>('telegram.bot.token');
+		this.allowedUserIds = new Set(this.getAllowedUserIds());
 
-		if (botToken) this.bot = new TelegramBot(botToken, { polling: true });
-		else return;
-
-		this.initOnErrors(this.bot);
-	}
-
-	private getChatIds() {
-		const chatIds = this.configService.get('telegram.chats');
-
-		if (Array.isArray(chatIds)) {
-			return chatIds
-				.map((i) => Number(i))
-				.filter((i) => i && typeof i === 'number');
+		if (botToken) {
+			this.bot = new TelegramBot(botToken, { polling: true });
+			this.handleErrors();
+		} else {
+			this.logger.warn('Telegram bot token not provided');
 		}
-
-		return [];
 	}
 
-	private initOnErrors(bot: TelegramBot) {
-		bot.on('polling_error', (error) => {
+	private getAllowedUserIds(): number[] {
+		const chatIds =
+			this.configService.get<(string | number)[]>('allowed-user-ids');
+		return Array.isArray(chatIds)
+			? chatIds.map(Number).filter(Number.isInteger)
+			: [];
+	}
+
+	private handleErrors(): void {
+		if (!this.bot) return;
+
+		this.bot.on('polling_error', (error) => {
 			this.logger.error('Telegram polling error', { error });
 		});
 
-		bot.on('webhook_error', (error) => {
+		this.bot.on('webhook_error', (error) => {
 			this.logger.error('Telegram webhook error', { error });
 		});
 	}
 
-	async setCommands(commands: IBotCommand[]) {
+	async setCommands(commands: IBotCommand[]): Promise<void> {
 		if (!this.bot) {
-			this.logger.warn('Telegram bot is not connected');
+			this.logger.warn('Telegram bot is not initialized');
 			return;
 		}
+
+		this.registerCommandHandlers(commands);
+		await this.updateBotCommands(commands);
+	}
+
+	private registerCommandHandlers(commands: IBotCommand[]): void {
+		if (!this.bot) return;
 
 		for (const command of commands) {
 			this.bot.onText(new RegExp(`^${command.command}$`), (msg) => {
 				const chatId = msg.chat.id;
+				const userId = msg.from?.id;
 
-				if (!this.chatIds.includes(chatId)) {
-					this.bot!.sendMessage(chatId, 'Вам запрешено!');
+				if (!userId || !this.allowedUserIds.has(userId)) {
+					this.bot!.sendMessage(chatId, 'Access denied.');
 					return;
 				}
 
 				command.exec(msg, this.bot!);
 			});
 		}
-
-		await this.bot
-			.setMyCommands(
-				commands.map((command) => ({
-					command: command.command,
-					description: command.description,
-				})),
-			)
-			.then((res) => {
-				if (res) {
-					this.logger.debug('Telegram commands set successfully');
-				} else {
-					this.logger.error(
-						'Telegram commands can not set successfully',
-					);
-				}
-			})
-			.catch((err) => {
-				this.logger.error('Telegram commands can not set', err);
-			});
 	}
 
-	async sendMessage(text: string): Promise<void> {
+	private async updateBotCommands(commands: IBotCommand[]): Promise<void> {
+		if (!this.bot) return;
+
+		const botCommands = commands.map((command) => ({
+			command: command.command,
+			description: command.description,
+		}));
+
+		try {
+			const result = await this.bot.setMyCommands(botCommands);
+			if (result) {
+				this.logger.debug('Telegram commands set successfully');
+			} else {
+				this.logger.error('Failed to set Telegram commands');
+			}
+		} catch (error) {
+			this.logger.error('Error setting Telegram commands', { error });
+		}
+	}
+
+	async sendMessage(chatId: number, text: string): Promise<void> {
 		if (!this.bot) return;
 
 		try {
-			for (const chatId of this.chatIds) {
-				await this.bot.sendMessage(chatId, text);
-				await sleep(200);
-			}
-		} catch (telegramError) {
-			this.logger.error(
-				'Failed to send Telegram message:',
-				telegramError as any,
-			);
+			await this.bot.sendMessage(chatId, text);
+		} catch (error) {
+			this.logger.error('Failed to send Telegram message', {
+				error,
+				chatId,
+			});
 		}
 	}
 }
+
+export default TelegramService;

@@ -1,19 +1,19 @@
 import { WalletBalance } from './wallet.interface';
 
-export type SpotOrder = {
+export type TraidingBotOrder = {
 	price: number;
 	quantity: number;
 	type: 'buy' | 'sell';
 	fee: number;
 };
 
-export type SpotTradingSnapshot = {
+export type TradingBotSnapshot = {
 	currentPrice: number;
 	datetime: Date;
 	walletBalance: WalletBalance;
 };
 
-export type SpotGridBotState = {
+export type GridBotState = {
 	minPrice: number;
 	maxPrice: number;
 };
@@ -25,3 +25,11 @@ export type SpotReverseGridBotConfig = {
 	minOpenGridCount: number;
 	takeProfitOnGrid?: number;
 };
+
+export enum BotState {
+	Idle = 'idle',
+	Initializing = 'initializing',
+	Running = 'running',
+	Stopping = 'stopping',
+	Stopped = 'stopped',
+}
