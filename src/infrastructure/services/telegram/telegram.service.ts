@@ -1,4 +1,7 @@
-import { IBotCommand } from '@/domain/adapters/telegram.interface';
+import {
+	IBotCallbackQuery,
+	IBotCommand,
+} from '@/domain/adapters/telegram.interface';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import TelegramBot from 'node-telegram-bot-api';
@@ -61,6 +64,27 @@ export class TelegramService {
 
 		this.registerCommandHandlers(commands);
 		await this.updateBotCommands(commands);
+	}
+
+	async useCallbackQueries(callbackQueries: IBotCallbackQuery[]) {
+		if (!this.bot) {
+			this.logger.warn('Telegram bot is not initialized');
+			return;
+		}
+
+		// Listen for callback queries from inline keyboard buttons
+		this.bot.on('callback_query', (query: TelegramBot.CallbackQuery) => {
+			const chatId = query.message?.chat.id;
+			const data = query.data;
+
+			if (!chatId || !data) return;
+
+			const foundExecutor = callbackQueries.find((executor) =>
+				executor.isMatch(data),
+			);
+
+			if (foundExecutor) foundExecutor.exec(query, this.bot!);
+		});
 	}
 
 	private registerCommandHandlers(commands: IBotCommand[]): void {

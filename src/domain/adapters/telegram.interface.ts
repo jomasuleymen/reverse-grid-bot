@@ -1,8 +1,19 @@
+import { Injectable } from '@nestjs/common';
 import TelegramBot from 'node-telegram-bot-api';
 
-export interface IBotCommand {
+@Injectable()
+export abstract class IBotCommand {
 	command: string;
 	description: string;
 
-	exec(msg: TelegramBot.Message, bot: TelegramBot): any;
+	abstract exec(msg: TelegramBot.Message, bot: TelegramBot): Promise<any>;
+}
+
+@Injectable()
+export abstract class IBotCallbackQuery {
+	abstract isMatch(data: string): boolean;
+	abstract exec(
+		query: TelegramBot.CallbackQuery,
+		bot: TelegramBot,
+	): Promise<any>;
 }
