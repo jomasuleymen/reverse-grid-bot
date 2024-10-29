@@ -2,57 +2,82 @@ import {
 	IBotCallbackQuery,
 	IBotCommand,
 } from '@/domain/adapters/telegram.interface';
+import { UserEntity } from '@/infrastructure/entities/account/user.entity';
+import { TradingBotConfigEntity } from '@/infrastructure/entities/trading/trading-config.entity';
+import { BotConfigRepository } from '@/infrastructure/repositories/trading/trading-config.repo';
+import { Injectable } from '@nestjs/common';
 import TelegramBot from 'node-telegram-bot-api';
+import {
+	EDIT_CONFIG_FIELD_PREFIX,
+	getConfigEditKeyboards,
+	getConfigText,
+	getEditFieldFromCallbackData,
+} from './common';
 
-const EDIT_CONFIG_FIELD_PREFIX: string = 'edit_trading_config_';
-
-const getCallbackData = (field: string) =>
-	`${EDIT_CONFIG_FIELD_PREFIX}${field}`;
-const getFieldFromCallbackData = (callbackData: string) =>
-	callbackData.replace(EDIT_CONFIG_FIELD_PREFIX, '');
-
+@Injectable()
 class EditTradingConfigCommand extends IBotCommand {
 	command = 'editconfig';
 	description = 'Edit config';
 
-	async exec(msg: TelegramBot.Message, bot: TelegramBot) {
+	constructor(private readonly botConfigRepo: BotConfigRepository) {
+		super();
+	}
+
+	async exec(msg: TelegramBot.Message, bot: TelegramBot, user: UserEntity) {
 		const chatId = msg.chat.id;
 
-		const configFields = ['gridCount'];
+		const config = (await this.botConfigRepo.findByUserId(user.id, {
+			createIfNotExists: true,
+		}))!;
 
-		const keyboard: TelegramBot.InlineKeyboardMarkup = {
-			inline_keyboard: configFields.map((field) => [
-				{
-					text: `Edit ${field}`,
-					callback_data: getCallbackData(field),
-				},
-			]),
-		};
-
-		bot.sendMessage(chatId, 'Select a configuration field to edit:', {
-			reply_markup: keyboard,
+		bot.sendMessage(chatId, getConfigText(config), {
+			reply_markup: {
+				inline_keyboard: getConfigEditKeyboards(),
+			},
 		});
 	}
 }
 
+@Injectable()
 class EditTradingConfigCallbackQuery extends IBotCallbackQuery {
-	async exec(query: TelegramBot.CallbackQuery, bot: TelegramBot) {
+	constructor(private readonly botConfigRepo: BotConfigRepository) {
+		super();
+	}
+
+	async exec(
+		query: TelegramBot.CallbackQuery,
+		bot: TelegramBot,
+		user: UserEntity,
+	) {
 		const chatId = query.message?.chat.id;
 		const data = query.data;
 
 		if (!chatId || !data || !this.isMatch(data)) return;
 
-		const field = getFieldFromCallbackData(data);
+		const field = getEditFieldFromCallbackData(data);
 
 		// TODO: check if fields available
 
 		bot.sendMessage(chatId, `Enter a new value for ${field}:`);
 		bot.once('message', async (msg) => {
 			if (msg.text) {
-				bot.sendMessage(
-					chatId,
-					`Configuration updated: ${field} = ${msg.text}`,
-				);
+				const config = (await this.botConfigRepo.findByUserId(user.id, {
+					createIfNotExists: true,
+				}))!;
+
+				if (field in config) {
+					config[field as keyof TradingBotConfigEntity] = Number(
+						msg.text,
+					) as any;
+				}
+
+				await this.botConfigRepo.save(config);
+
+				bot.sendMessage(chatId, getConfigText(config), {
+					reply_markup: {
+						remove_keyboard: true,
+					},
+				});
 			} else {
 				bot.sendMessage(chatId, 'Invalid input. Please try again.');
 			}

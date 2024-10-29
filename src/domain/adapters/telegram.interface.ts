@@ -1,3 +1,4 @@
+import { UserEntity } from '@/infrastructure/entities/account/user.entity';
 import { Injectable } from '@nestjs/common';
 import TelegramBot from 'node-telegram-bot-api';
 
@@ -6,7 +7,11 @@ export abstract class IBotCommand {
 	command: string;
 	description: string;
 
-	abstract exec(msg: TelegramBot.Message, bot: TelegramBot): Promise<any>;
+	abstract exec(
+		msg: TelegramBot.Message,
+		bot: TelegramBot,
+		user: UserEntity,
+	): Promise<any>;
 }
 
 @Injectable()
@@ -15,5 +20,6 @@ export abstract class IBotCallbackQuery {
 	abstract exec(
 		query: TelegramBot.CallbackQuery,
 		bot: TelegramBot,
+		user: UserEntity,
 	): Promise<any>;
 }

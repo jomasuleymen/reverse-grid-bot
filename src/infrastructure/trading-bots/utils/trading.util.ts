@@ -1,5 +1,5 @@
 import { TraidingBotOrder } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
-import { KLineRepo } from '@/infrastructure/repositories/trading/kline.repo';
+import { KLineRepository } from '@/infrastructure/repositories/trading/kline.repo';
 import { Injectable } from '@nestjs/common';
 import { RestClientV5 } from 'bybit-api';
 
@@ -22,7 +22,7 @@ type KlineInterval =
 export class TradingUtils {
 	private readonly restClient: RestClientV5;
 
-	constructor(private readonly klineRepo: KLineRepo) {
+	constructor(private readonly klineRepo: KLineRepository) {
 		this.restClient = new RestClientV5({ parseAPIRateLimits: true });
 		// this.restClient
 		// 	.getKline({

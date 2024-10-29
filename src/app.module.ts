@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AllExceptionsFilter } from './infrastructure/common/filters/all-exception.filter';
 import { getConfigModuleOptions } from './infrastructure/configs/config-service';
 import { ExchangesModule } from './infrastructure/exchanges/exchanges.module';
 import { RepositoriesModule } from './infrastructure/repositories/repositories.module';
@@ -13,7 +15,7 @@ import { PresentationModule } from './presentation/presentation.module';
 	imports: [
 		ConfigModule.forRoot(getConfigModuleOptions()),
 		ScheduleModule.forRoot(),
-		
+
 		PresentationModule,
 		ExchangesModule,
 		TradingBotsModules,
@@ -23,6 +25,11 @@ import { PresentationModule } from './presentation/presentation.module';
 		RepositoriesModule,
 	],
 	controllers: [],
-	providers: [],
+	providers: [
+		{
+			provide: APP_FILTER,
+			useClass: AllExceptionsFilter,
+		},
+	],
 })
 export class AppModule {}

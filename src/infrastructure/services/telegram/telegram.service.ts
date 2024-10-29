@@ -6,6 +6,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import TelegramBot from 'node-telegram-bot-api';
 import LoggerService from '../logger/logger.service';
+import { UserRepository } from '@/infrastructure/repositories/account/user.repo';
 
 @Injectable()
 export class TelegramService {
@@ -15,6 +16,7 @@ export class TelegramService {
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly logger: LoggerService,
+		private readonly userRepo: UserRepository,
 	) {
 		const botToken = this.configService.get<string>('telegram.bot.token');
 		this.allowedUserIds = new Set(this.getAllowedUserIds());
@@ -73,35 +75,83 @@ export class TelegramService {
 		}
 
 		// Listen for callback queries from inline keyboard buttons
-		this.bot.on('callback_query', (query: TelegramBot.CallbackQuery) => {
-			const chatId = query.message?.chat.id;
-			const data = query.data;
+		this.bot.on(
+			'callback_query',
+			async (query: TelegramBot.CallbackQuery) => {
+				try {
+					const chatId = query.message?.chat.id;
+					const userId = query.from.id;
+					const data = query.data;
 
-			if (!chatId || !data) return;
+					if (!chatId || !data) return;
 
-			const foundExecutor = callbackQueries.find((executor) =>
-				executor.isMatch(data),
-			);
+					const foundExecutor = callbackQueries.find((executor) =>
+						executor.isMatch(data),
+					);
 
-			if (foundExecutor) foundExecutor.exec(query, this.bot!);
-		});
+					if (!foundExecutor) return;
+					let user = await this.userRepo.findByTelegramUserId(
+						userId!,
+					);
+
+					if (!user)
+						user = await this.userRepo.saveUser({
+							chatId,
+							telegramUserId: userId!,
+							firstName: query.from?.first_name!,
+							username: query.from?.username!,
+						});
+					await foundExecutor.exec(query, this.bot!, user);
+				} catch (err: any) {
+					this.logger.fatal(
+						'Telegram callback query handler exception',
+						err,
+					);
+				}
+			},
+		);
 	}
 
 	private registerCommandHandlers(commands: IBotCommand[]): void {
 		if (!this.bot) return;
 
 		for (const command of commands) {
-			this.bot.onText(new RegExp(`^/${command.command}$`), (msg) => {
-				const chatId = msg.chat.id;
-				const userId = msg.from?.id;
+			this.bot.onText(
+				new RegExp(`^/${command.command}$`),
+				async (msg) => {
+					try {
+						const chatId = msg.chat.id;
+						const userId = msg.from?.id;
 
-				if (!this.checkIsUserAllowed(userId)) {
-					this.bot!.sendMessage(chatId, `Доступ запрещен. ${userId}`);
-					return;
-				}
+						if (!this.checkIsUserAllowed(userId)) {
+							this.bot!.sendMessage(
+								chatId,
+								`Доступ запрещен. ${userId}`,
+							);
+							return;
+						}
 
-				command.exec(msg, this.bot!);
-			});
+						let user = await this.userRepo.findByTelegramUserId(
+							userId!,
+						);
+
+						if (!user)
+							user = await this.userRepo.saveUser({
+								chatId,
+								telegramUserId: userId!,
+								firstName: msg.from?.first_name!,
+								username: msg.from?.username!,
+							});
+
+						await command.exec(msg, this.bot!, user);
+					} catch (err: any) {
+						this.logger.fatal(
+							'Telegram command handler exception',
+							err,
+						);
+					}
+				},
+			);
 		}
 	}
 
