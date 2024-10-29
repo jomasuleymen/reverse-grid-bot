@@ -21,7 +21,7 @@ class LoggerService {
 	warn(message: string, obj?: object) {
 		this.log('warn', message, obj);
 	}
-	error(message: string, obj?: object) {
+	error(message: string, obj?: any) {
 		this.log('error', message, obj);
 	}
 	fatal(message: string, obj?: object) {
