@@ -1,6 +1,5 @@
 import { MyContext, WIZARDS } from '@/domain/adapters/telegram.interface';
 import { UserEntity } from '@/infrastructure/entities/account/user.entity';
-import { TradingBotConfigEntity } from '@/infrastructure/entities/trading/trading-config.entity';
 import { UserRepository } from '@/infrastructure/repositories/account/user.repo';
 import { BotConfigRepository } from '@/infrastructure/repositories/trading/trading-config.repo';
 import { Action, Ctx, Wizard, WizardStep } from 'nestjs-telegraf';
@@ -9,7 +8,7 @@ import {
 	CALLBACK_ACTIONS,
 	EDIT_CONFIG_FIELD_PREFIX,
 } from '../common/constants';
-import { TradingUpdateBase } from './common';
+import { FieldKey, formFieldConfig, TradingUpdateBase } from './common';
 
 @Wizard(WIZARDS.TRADING_EDIT_CONFIG)
 export class EditConfigWizard extends TradingUpdateBase {
@@ -67,26 +66,25 @@ export class EditConfigWizard extends TradingUpdateBase {
 
 	@WizardStep(2)
 	async handleNewValueInput(@Ctx() ctx: MyContext) {
-		const field = (ctx.wizard.state as any)
-			.field as keyof TradingBotConfigEntity;
-		// @ts-ignore
-		const newValue = ctx.message?.text;
+		const field = (ctx.wizard.state as any).field as FieldKey;
+		const newValue = ctx.text;
 
 		await this.removePreviousKeyboards(ctx);
 
-		if (!newValue || isNaN(Number(newValue))) {
+		const fieldConfig = formFieldConfig[field];
+		if (!fieldConfig.validation(newValue)) {
 			const message = await ctx.reply(
-				'Please enter a valid numeric value.',
-				Markup.inlineKeyboard([this.createButton(this.cancelButton)]),
+				'Please enter a valid value.',
+				Markup.inlineKeyboard([this.cancelButton()]),
 			);
 			(ctx.wizard.state as any).prevMsgId = message.message_id;
 			return;
 		}
-
 		const user = await this.fetchUser(ctx);
 		const config = await this.fetchUserConfig(user.id);
 
-		config[field] = Number(newValue) as any;
+		// @ts-ignore
+		config[fieldConfig.dbField] = fieldConfig.parse(newValue);
 		await this.botConfigRepo.save(config);
 
 		return await ctx.scene.reenter();
@@ -95,12 +93,27 @@ export class EditConfigWizard extends TradingUpdateBase {
 	@Action(new RegExp(`^${EDIT_CONFIG_FIELD_PREFIX}`))
 	async handleFieldEditSelection(@Ctx() ctx: MyContext) {
 		const field = this.parseFieldFromCallback(
-			(ctx.callbackQuery as any).data,
+			(ctx.callbackQuery as any).data as string,
 		);
 		(ctx.wizard.state as any).field = field;
-
-		await ctx.editMessageText(`Enter a new value for ${field}:`);
 		(ctx.wizard.state as any).prevMsgId = null;
+
+		const fieldConfig = formFieldConfig[field];
+
+		if (fieldConfig.options) {
+			await ctx.editMessageReplyMarkup(undefined);
+			await ctx.reply(
+				fieldConfig.inputPrompt,
+				Markup.keyboard(
+					fieldConfig.options.map((opt) => Markup.button.text(opt)),
+				)
+					.oneTime()
+					.resize(),
+			);
+		} else {
+			await ctx.editMessageText(fieldConfig.inputPrompt);
+		}
+
 		await ctx.wizard.next();
 	}
 

@@ -1,4 +1,6 @@
+import { TradingBotsApplicationService } from '@/application/services/trading-bots.service';
 import { MyContext, WIZARDS } from '@/domain/adapters/telegram.interface';
+import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
 import { BotConfigRepository } from '@/infrastructure/repositories/trading/trading-config.repo';
 import TelegramService from '@/infrastructure/services/telegram/telegram.service';
 import { Action, Command, Ctx, Start, Update } from 'nestjs-telegraf';
@@ -10,14 +12,15 @@ export class TradingTelegramUpdate extends TradingUpdateBase {
 	constructor(
 		private readonly botConfigRepo: BotConfigRepository,
 		private readonly telegramService: TelegramService,
+		private readonly tradingBotService: TradingBotsApplicationService,
 	) {
 		super();
 		this.telegramService.addMyCommands([
 			{ command: BOT_COMMANDS.START, description: 'Старт бота' },
-			{ command: BOT_COMMANDS.STOP, description: 'Stop the bot' },
+			{ command: BOT_COMMANDS.STOP, description: 'Остановить бота' },
 			{
 				command: BOT_COMMANDS.EDIT_CONFIG,
-				description: 'Edit bot config',
+				description: 'Настроить бота',
 			},
 		]);
 	}
@@ -26,7 +29,7 @@ export class TradingTelegramUpdate extends TradingUpdateBase {
 	async handleStartCommand(@Ctx() ctx: MyContext) {
 		const config = await this.botConfigRepo.findByUserId(ctx.user.id);
 		const text = config
-			? `${this.formatConfigText(config)}\nThe configuration correct?`
+			? `Проверяйте данные на корректность!\n\n${this.formatConfigText(config)}`
 			: 'Перед старторм нужно конфигурироввать через команду, /editconfig';
 
 		await ctx.reply(text, {
@@ -35,18 +38,18 @@ export class TradingTelegramUpdate extends TradingUpdateBase {
 						inline_keyboard: [
 							[
 								{
-									text: 'Edit',
+									text: 'Изменить настройку',
 									callback_data: BOT_COMMANDS.EDIT_CONFIG,
 								},
 							],
 							[
 								{
-									text: 'Start',
+									text: 'Начать',
 									callback_data:
 										CALLBACK_ACTIONS.CONFIRM_START,
 								},
 								{
-									text: 'Закрыть',
+									text: 'Отмена',
 									callback_data:
 										CALLBACK_ACTIONS.CANCEL_START,
 								},
@@ -59,7 +62,21 @@ export class TradingTelegramUpdate extends TradingUpdateBase {
 
 	@Command(BOT_COMMANDS.STOP)
 	async handleStopCommand(@Ctx() ctx: MyContext) {
-		await ctx.reply('Stop button clicked');
+		this.tradingBotService
+			.stopReverseBot(
+				{
+					userId: ctx.user.id,
+					exchange: ExchangeEnum.Bybit,
+				},
+				async (msg) => {
+					await ctx.reply(msg).catch((err) => {
+						console.log(err.message);
+					});
+				},
+			)
+			.catch(async (err) => {
+				await ctx.reply(err.message);
+			});
 	}
 
 	@Command(BOT_COMMANDS.EDIT_CONFIG)
@@ -69,6 +86,7 @@ export class TradingTelegramUpdate extends TradingUpdateBase {
 
 	@Action(BOT_COMMANDS.EDIT_CONFIG)
 	async handleEditConfigAction(@Ctx() ctx: MyContext) {
+		await ctx.editMessageReplyMarkup(undefined);
 		await ctx.answerCbQuery();
 		await ctx.scene.enter(WIZARDS.TRADING_EDIT_CONFIG);
 	}
@@ -76,12 +94,28 @@ export class TradingTelegramUpdate extends TradingUpdateBase {
 	@Action([CALLBACK_ACTIONS.CONFIRM_START, CALLBACK_ACTIONS.CANCEL_START])
 	async handleStartConfirmation(@Ctx() ctx: MyContext) {
 		const action = (ctx.callbackQuery as any).data;
-		const responseText =
-			action === CALLBACK_ACTIONS.CONFIRM_START
-				? 'Configuration confirmed. Bot is starting.'
-				: 'Configuration cancelled.';
 
-		await ctx.editMessageText(responseText);
 		await ctx.answerCbQuery();
+		await ctx.editMessageReplyMarkup(undefined);
+
+		if (action === CALLBACK_ACTIONS.CONFIRM_START) {
+			this.tradingBotService
+				.startReverseBot(
+					{
+						userId: ctx.user.id,
+						exchange: ExchangeEnum.Bybit,
+					},
+					async (msg) => {
+						await ctx.reply(msg).catch((err) => {
+							console.log(err.message);
+						});
+					},
+				)
+				.catch(async (err) => {
+					await ctx.reply(err.message);
+				});
+		} else {
+			await ctx.reply('Операция отменена');
+		}
 	}
 }

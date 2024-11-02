@@ -12,9 +12,6 @@ class LoggerService {
 		this.pinoLogger = this.createLogger();
 	}
 
-	debug(message: string, obj?: object) {
-		this.log('debug', message, obj);
-	}
 	info(message: string, obj?: object) {
 		this.log('info', message, obj);
 	}
@@ -70,7 +67,6 @@ class LoggerService {
 			'info',
 			'trace',
 			'warn',
-			'debug',
 			'error',
 			'fatal',
 		];

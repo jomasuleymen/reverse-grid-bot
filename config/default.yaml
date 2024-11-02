@@ -1,11 +1,9 @@
 binance:
-    isTestnet: true
     api:
         key: 
         secret: 
 
 bybit:
-    isDemoTrading: true
     api:
         key: 
         secret: 
@@ -19,7 +17,6 @@ telegram:
 logger:
     type: local # local | axiom
 
-    # if selected type axiom
     axiom:
         token: 
         dataset: 

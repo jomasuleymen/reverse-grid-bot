@@ -1,3 +1,4 @@
+import { ServicesModule } from '@/application/services.module';
 import { MyContext } from '@/domain/adapters/telegram.interface';
 import { UserRepository } from '@/infrastructure/repositories/account/user.repo';
 import { RepositoriesModule } from '@/infrastructure/repositories/repositories.module';
@@ -10,7 +11,7 @@ import { EditConfigWizard } from './trading/trading-config-wizard';
 import { TradingTelegramUpdate } from './trading/trading-update';
 
 @Module({
-	imports: [RepositoriesModule, TelegramModule],
+	imports: [RepositoriesModule, TelegramModule, ServicesModule],
 	providers: [TradingTelegramUpdate, EditConfigWizard],
 })
 @Update()

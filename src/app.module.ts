@@ -6,7 +6,7 @@ import { ExchangesModule } from './infrastructure/exchanges/exchanges.module';
 import { RepositoriesModule } from './infrastructure/repositories/repositories.module';
 import { CustomLoggerModule } from './infrastructure/services/logger/logger.module';
 import { TelegramModule } from './infrastructure/services/telegram/telegram.module';
-import { TradingBotsModules } from './infrastructure/trading-bots/trade-bots.module';
+import { TradingBotsModules } from './infrastructure/trading-bots/trading-bots.module';
 import { PresentationModule } from './presentation/presentation.module';
 
 @Module({

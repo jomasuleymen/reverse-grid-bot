@@ -27,9 +27,14 @@ export type SpotReverseGridBotConfig = {
 };
 
 export enum BotState {
-	Idle = 'idle',
-	Initializing = 'initializing',
-	Running = 'running',
-	Stopping = 'stopping',
-	Stopped = 'stopped',
+	Idle = 1,
+	Initializing = 2,
+	Running = 3,
+	Stopping = 4,
+	Stopped = 5,
+}
+
+export enum TradingBotAccountType {
+	Testnet = 1,
+	Real = 2,
 }

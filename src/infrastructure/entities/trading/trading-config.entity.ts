@@ -1,3 +1,6 @@
+import { TradingBotAccountType } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { UserEntity } from '@/infrastructure/entities/account/user.entity';
+import { IsEnum, IsNumber, IsString } from 'class-validator';
 import {
 	Column,
 	Entity,
@@ -6,15 +9,36 @@ import {
 	OneToOne,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
-import { UserEntity } from '../account/user.entity';
 
 @Entity('trading_bot_config')
 export class TradingBotConfigEntity {
 	@PrimaryGeneratedColumn()
 	id: number;
 
+	@IsNumber({}, { message: 'Тейк профит должен быть числом.' })
+	@Column({ type: 'real', nullable: true })
+	takeProfit: number;
+
+	@IsNumber({}, { message: 'Шаг сетки должен быть числом.' })
+	@Column({ type: 'real', nullable: true })
+	gridStep: number;
+
+	@IsNumber({}, { message: 'Объём сетки должен быть числом.' })
+	@Column({ type: 'real', nullable: true })
+	gridVolume: number;
+
+	@IsEnum(TradingBotAccountType, {
+		message: 'Режим аккаунта должен быть либо "Тестовый", либо "Реальный".',
+	})
+	@Column({
+		type: 'integer',
+		default: TradingBotAccountType.Testnet,
+	})
+	accountMode: TradingBotAccountType;
+
+	@IsString({ message: 'Символ должен быть строкой.' })
 	@Column({ nullable: true })
-	closeAtPrice: number;
+	symbol: string;
 
 	@Index()
 	@Column()
