@@ -32,7 +32,11 @@ export class TelegramBotModule implements OnModuleInit {
 
 		const userId = ctx.from?.id;
 
-		if (!userId || !this.telegramService.isUserAllowed(userId)) {
+		// if (!userId || !this.telegramService.isUserAllowed(userId)) {
+		// 	await ctx.reply(`У вас нету доступа. user id: ${userId}`);
+		// 	return;
+		// }
+		if (!userId) {
 			await ctx.reply(`У вас нету доступа. user id: ${userId}`);
 			return;
 		}
