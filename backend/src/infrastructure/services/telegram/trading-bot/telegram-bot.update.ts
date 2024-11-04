@@ -1,8 +1,17 @@
 import { MyContext } from '@/domain/adapters/telegram.interface';
+import { TelegramPreferencesService } from '@/infrastructure/notification/telegram-preferences.service';
 import TelegramService from '@/infrastructure/services/telegram/telegram.service';
 import { TradingBotConfigsService } from '@/infrastructure/trading-bots/trading-bot-configs.service';
 import { TradingBotService } from '@/infrastructure/trading-bots/trading-bots.service';
-import { Action, Command, Ctx, Start, Update } from 'nestjs-telegraf';
+import {
+	Action,
+	Command,
+	Ctx,
+	Next,
+	Start,
+	Update,
+	Use,
+} from 'nestjs-telegraf';
 import { CALLBACK_ACTIONS, TradingUpdateBase } from './common';
 
 const BOT_COMMANDS = {
@@ -15,6 +24,7 @@ export class TradingBotUpdate extends TradingUpdateBase {
 	constructor(
 		private readonly botConfigService: TradingBotConfigsService,
 		private readonly telegramService: TelegramService,
+		private readonly telegramPreferencesService: TelegramPreferencesService,
 		private readonly tradingBotService: TradingBotService,
 	) {
 		super();
@@ -22,6 +32,22 @@ export class TradingBotUpdate extends TradingUpdateBase {
 			{ command: BOT_COMMANDS.START, description: 'Старт бота' },
 			{ command: BOT_COMMANDS.STOP, description: 'Остановить бота' },
 		]);
+	}
+
+	@Use()
+	async validateUser(@Ctx() ctx: MyContext, @Next() next: any) {
+		if (ctx.from?.is_bot) return;
+
+		const userId = ctx.from?.id;
+
+		let account =
+			await this.telegramPreferencesService.findByTelegramUserId(userId!);
+		if (!account) {
+			await ctx.reply(`У вас нету доступа. user id: ${userId}`);
+			return;
+		}
+
+		return await next();
 	}
 
 	@Start()

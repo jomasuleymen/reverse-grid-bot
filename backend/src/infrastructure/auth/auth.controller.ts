@@ -9,7 +9,6 @@ export class AuthController {
 	@Post('login')
 	async login(@Req() req: Request) {
 		return req.user;
-		
 	}
 
 	@UseGuards(AuthGuard)
