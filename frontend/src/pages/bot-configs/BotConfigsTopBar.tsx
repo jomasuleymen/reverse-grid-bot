@@ -5,6 +5,7 @@ import CustomInputNumber from '@/components/CustomInputNumber'
 import UpsertModalForm from '@/components/UpsertModalForm'
 import { SERVICES } from '@/services'
 import { CreateTradingBotConfig } from '@/services/trading-bot.service'
+import { TRADING_BOT_QUERY_KEY } from '.'
 
 export type TCreateTradingBotConfigForm = CreateTradingBotConfig
 
@@ -39,15 +40,13 @@ export const BotConfigFormItems: FormItemProps<TCreateTradingBotConfigForm>[] = 
   },
 ]
 
-interface TopBarProps {
-  queryKey: string[]
-}
+interface TopBarProps {}
 
 const onSubmit = async (data: TCreateTradingBotConfigForm) => {
   return await SERVICES.TRADING_BOT.CONFIGS.create(data)
 }
 
-const TopBar: React.FC<TopBarProps> = ({ queryKey }) => {
+const TopBar: React.FC<TopBarProps> = ({}) => {
   return (
     <Row align="middle" justify="space-between">
       <Col></Col>
@@ -56,7 +55,7 @@ const TopBar: React.FC<TopBarProps> = ({ queryKey }) => {
           buttonText="Добавить настройку"
           title="Добавить настройку"
           onSubmit={onSubmit}
-          queryKey={queryKey}
+          queryKey={TRADING_BOT_QUERY_KEY}
           formItems={BotConfigFormItems}
           parseError={(error: { message: string }) => {
             return error.message

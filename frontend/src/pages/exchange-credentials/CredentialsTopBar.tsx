@@ -4,10 +4,11 @@ import React from 'react'
 import UpsertModalForm from '@/components/UpsertModalForm'
 import { SERVICES } from '@/services'
 import {
-	CreateExchangeCredentials,
-	ExchangeCredentialsType,
-	ExchangeEnum,
+  CreateExchangeCredentials,
+  ExchangeCredentialsType,
+  ExchangeEnum,
 } from '@/services/exchanges.service'
+import { TRADING_BOT_CREDENTIALS_QUERY_KEY } from '.'
 
 export type TCreateExchangeCredentialsForm = CreateExchangeCredentials
 
@@ -52,15 +53,13 @@ export const ExchangeCredentialsFormItems: FormItemProps<TCreateExchangeCredenti
   },
 ]
 
-interface TopBarProps {
-  queryKey: string[]
-}
+interface TopBarProps {}
 
 const onSubmit = async (data: TCreateExchangeCredentialsForm) => {
   return await SERVICES.EXCHANGE.CREDENTIALS.create(data)
 }
 
-const TopBar: React.FC<TopBarProps> = ({ queryKey }) => {
+const TopBar: React.FC<TopBarProps> = ({}) => {
   return (
     <Row align="middle" justify="space-between">
       <Col></Col>
@@ -69,7 +68,7 @@ const TopBar: React.FC<TopBarProps> = ({ queryKey }) => {
           buttonText="Добавить аккаунт"
           title="Добавить аккаунт"
           onSubmit={onSubmit}
-          queryKey={queryKey}
+          queryKey={TRADING_BOT_CREDENTIALS_QUERY_KEY}
           formItems={ExchangeCredentialsFormItems}
           parseError={(error: { message: string }) => {
             return error.message

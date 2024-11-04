@@ -2,9 +2,8 @@
 
 .block {
 	@extend .paper;
-	max-width: 570px;
 	padding: 10px 15px;
-	$label-size: 12.5px;
+	$label-size: 14px;
 
 	input::-webkit-input-placeholder,
 	span {

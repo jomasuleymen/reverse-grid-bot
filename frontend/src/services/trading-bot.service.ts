@@ -1,4 +1,5 @@
 import $api from '@/utils/http'
+import { ExchangeCredentials } from './exchanges.service'
 
 const TRADING_BOT_ENDPOINT = '/trading-bots'
 const TRADING_BOT_CONFIGS_ENDPOINT = TRADING_BOT_ENDPOINT + '/configs'
@@ -10,6 +11,11 @@ export type TradingBotConfig = {
   gridVolume: number
   symbol: string
 }
+
+export type TradingBot = {
+  id: number
+} & Omit<TradingBotConfig, 'id'> &
+  Omit<ExchangeCredentials, 'id'>
 
 export type CreateTradingBotConfig = Omit<TradingBotConfig, 'id'>
 
@@ -31,6 +37,20 @@ const CONFIGS_API = {
   },
 }
 
+interface ITradingBotFilter {
+  isActive?: boolean
+}
+
 export const TRADING_BOT_API = {
   CONFIGS: CONFIGS_API,
+
+  async fetchAll(filter?: ITradingBotFilter) {
+    return await $api
+      .get<TradingBot[]>(TRADING_BOT_ENDPOINT, { data: filter })
+      .then((res) => res.data)
+  },
+
+  async stopBot(botId: number) {
+    return await $api.post<any>(`${TRADING_BOT_ENDPOINT}/stop`, { botId }).then((res) => res.data)
+  },
 }

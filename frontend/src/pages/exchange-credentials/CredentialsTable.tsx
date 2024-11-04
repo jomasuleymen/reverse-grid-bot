@@ -6,6 +6,7 @@ import React, { memo } from 'react'
 import { SERVICES } from '@/services'
 import { ExchangeCredentials } from '@/services/exchanges.service'
 import { Space } from 'antd'
+import { TRADING_BOT_CREDENTIALS_QUERY_KEY } from '.'
 
 type ColumnType = ExchangeCredentials & {
   key: number
@@ -47,18 +48,15 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
   },
 ]
 
-interface Props {
-  queryKey: string[]
-}
+interface Props {}
 
-const CredentialsTable: React.FC<Props> = ({ queryKey }) => {
+const CredentialsTable: React.FC<Props> = ({}) => {
   return (
     <DataTable
-      key="exchange-credentials-table"
       fetchData={SERVICES.EXCHANGE.CREDENTIALS.fetchAll}
-      queryKey={queryKey}
+      queryKey={TRADING_BOT_CREDENTIALS_QUERY_KEY}
       parseDataSource={parseDataSource}
-      columns={getColumns(queryKey)}
+      columns={getColumns(TRADING_BOT_CREDENTIALS_QUERY_KEY)}
       tableProps={{
         style: {
           width: 'max-content',

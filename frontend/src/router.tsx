@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 const MainLayout = React.lazy(() => import('@/layout'))
 const TradingBotConfigs = React.lazy(() => import('@/pages/bot-configs'))
 const TradingBotAccounts = React.lazy(() => import('@/pages/exchange-credentials'))
+const TradingBots = React.lazy(() => import('@/pages/trading-bots'))
 const LoginPage = React.lazy(() => import('@/pages/login'))
 
 type Route = {
@@ -22,13 +23,19 @@ export const routes: Route[] = [
     label: 'Конфигурации',
     path: '/configs',
     protected: true,
-    element: TradingBotConfigs, // Use extracted variable
+    element: TradingBotConfigs,
   },
   {
     label: 'Аккаунты бирж',
     path: '/exchange-credentials',
     protected: true,
-    element: TradingBotAccounts, // Use extracted variable
+    element: TradingBotAccounts,
+  },
+  {
+    label: 'Боты',
+    path: '/bots',
+    protected: true,
+    element: TradingBots,
   },
 ]
 

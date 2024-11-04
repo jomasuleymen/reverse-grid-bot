@@ -7,6 +7,7 @@ import UpsertModalForm from '@/components/UpsertModalForm'
 import { SERVICES } from '@/services'
 import { TradingBotConfig } from '@/services/trading-bot.service'
 import { Space } from 'antd'
+import { TRADING_BOT_QUERY_KEY } from '.'
 import { BotConfigFormItems, TCreateTradingBotConfigForm } from './BotConfigsTopBar'
 
 type ColumnType = TradingBotConfig & {
@@ -73,18 +74,15 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
   },
 ]
 
-interface Props {
-  queryKey: string[]
-}
+interface Props {}
 
-const BotConfigsTable: React.FC<Props> = ({ queryKey }) => {
+const BotConfigsTable: React.FC<Props> = ({}) => {
   return (
     <DataTable
-      key="bot-configs-table"
       fetchData={SERVICES.TRADING_BOT.CONFIGS.fetchAll}
-      queryKey={queryKey}
+      queryKey={TRADING_BOT_QUERY_KEY}
       parseDataSource={parseDataSource}
-      columns={getColumns(queryKey)}
+      columns={getColumns(TRADING_BOT_QUERY_KEY)}
       tableProps={{
         style: {
           width: 'max-content',

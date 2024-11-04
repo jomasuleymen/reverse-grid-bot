@@ -3,14 +3,14 @@ import React from 'react'
 import CredentialsTable from './CredentialsTable'
 import CredentialsTopBar from './CredentialsTopBar'
 
-const TradingBotCredentials: React.FC = () => {
-  const queryKey = ['trading-bot-credentials']
+export const TRADING_BOT_CREDENTIALS_QUERY_KEY = ['trading-bot-credentials']
 
+const TradingBotCredentials: React.FC = () => {
   return (
-    <div className="paper">
+    <div>
       <Space direction="vertical" style={{ width: '100%' }}>
-        <CredentialsTopBar queryKey={queryKey} />
-        <CredentialsTable queryKey={queryKey} />
+        <CredentialsTopBar />
+        <CredentialsTable />
       </Space>
     </div>
   )

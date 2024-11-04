@@ -3,14 +3,14 @@ import React from 'react'
 import BotConfigsTable from './BotConfigsTable'
 import BotConfigsTopBar from './BotConfigsTopBar'
 
-const TradingBotConfigs: React.FC = () => {
-  const queryKey = ['trading-bot-configs']
+export const TRADING_BOT_QUERY_KEY = ['trading-bot-configs']
 
+const TradingBotConfigs: React.FC = () => {
   return (
-    <div className="paper">
+    <div>
       <Space direction="vertical" style={{ width: '100%' }}>
-        <BotConfigsTopBar queryKey={queryKey} />
-        <BotConfigsTable queryKey={queryKey} />
+        <BotConfigsTopBar />
+        <BotConfigsTable />
       </Space>
     </div>
   )
