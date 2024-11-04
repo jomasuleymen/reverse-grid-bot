@@ -6,8 +6,8 @@ import Loading from './components/Loading'
 import ProtectedRoute from './components/ProtectedRoute'
 
 const MainLayout = React.lazy(() => import('@/layout'))
-const TradingBotConfigs = React.lazy(() => import('@/pages/trading-bot/configs'))
-const TradingBotAccounts = React.lazy(() => import('@/pages/trading-bot/accounts'))
+const TradingBotConfigs = React.lazy(() => import('@/pages/bot-configs'))
+const TradingBotAccounts = React.lazy(() => import('@/pages/exchange-credentials'))
 const LoginPage = React.lazy(() => import('@/pages/login'))
 
 type Route = {

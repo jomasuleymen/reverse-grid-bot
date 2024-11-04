@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Equal, Repository } from 'typeorm';
+import { CreateBotConfigDto } from './dto/create-config.dto';
 import { TradingBotConfigEntity } from './entities/trading-config.entity';
 
 @Injectable()
@@ -22,7 +23,14 @@ export class TradingBotConfigsService {
 		});
 	}
 
-	async save(payload: Partial<TradingBotConfigEntity>) {
-		return await this.botConfigRepo.save(payload);
+	async save(userId: number, dto: CreateBotConfigDto) {
+		return await this.botConfigRepo.save({
+			userId,
+			...dto,
+		});
+	}
+
+	async delete(id: number) {
+		return await this.botConfigRepo.delete(id);
 	}
 }

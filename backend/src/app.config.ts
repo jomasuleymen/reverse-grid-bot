@@ -1,5 +1,6 @@
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { ClassSerializerInterceptor, INestApplication, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { Reflector } from "@nestjs/core";
 import { ValidationException } from "./common/exceptions/validation.exceptions";
 
 export const configApp = async (app: INestApplication<any>) => {
@@ -14,6 +15,9 @@ export const configApp = async (app: INestApplication<any>) => {
 			transform: true,
 		}),
 	);
+
+	app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+
 
 	const origins = configService.get("origins", "*");
 	app.enableCors({

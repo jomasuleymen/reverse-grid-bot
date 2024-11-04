@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Equal, Repository } from 'typeorm';
+import { CreateCredentialsDto } from './dto/create-credentials.dto';
 import { ExchangeCredentialsEntity } from './entites/exchange-credentials.entity';
 
 @Injectable()
@@ -22,7 +23,14 @@ export class ExchangeCredentialsService {
 		});
 	}
 
-	async save(payload: Partial<ExchangeCredentialsEntity>) {
-		return await this.exchangeCredentialsRepo.save(payload);
+	async save(userId: number, payload: CreateCredentialsDto) {
+		return await this.exchangeCredentialsRepo.save({
+			userId,
+			...payload,
+		});
+	}
+
+	async delete(id: number) {
+		return await this.exchangeCredentialsRepo.delete(id);
 	}
 }

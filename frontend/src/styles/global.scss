@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+@import './custom-select.scss';
+@import './vars.scss';
+
 *,
 *::after,
 *::before {

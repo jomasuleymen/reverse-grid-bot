@@ -1,4 +1,4 @@
-import '@/styles/global.css'
+import '@/styles/global.scss'
 
 import { useEffect } from 'react'
 import ScreenLoading from './components/ScreenLoading'

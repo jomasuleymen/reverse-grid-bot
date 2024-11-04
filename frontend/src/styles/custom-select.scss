@@ -1,0 +1,11 @@
+.ant-select-dropdown {
+	.ant-select-item-option {
+		border-bottom: 0.2px solid rgba(217, 217, 217, 0.908);
+
+		.ant-select-item-option-content {
+			white-space: unset !important;
+			word-wrap: break-word;
+			word-break: break-word;
+		}
+	}
+}

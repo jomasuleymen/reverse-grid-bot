@@ -16,8 +16,8 @@ export type TradingBotSnapshot = {
 };
 
 export enum ExchangeCredentialsType {
-	Testnet = 1,
-	Real = 2,
+	Testnet = 'Testnet',
+	Real = 'Real',
 }
 
 export interface ITradingBotConfig {

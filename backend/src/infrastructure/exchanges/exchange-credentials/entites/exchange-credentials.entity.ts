@@ -17,7 +17,7 @@ export class ExchangeCredentialsEntity {
 
 	@Index()
 	@Column({
-		type: 'integer',
+		type: 'text',
 		default: ExchangeCredentialsType.Testnet,
 	})
 	type: ExchangeCredentialsType;

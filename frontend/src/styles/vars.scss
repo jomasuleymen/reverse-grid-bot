@@ -1,0 +1,39 @@
+$border-radius-base: 5px;
+$border-radius-sm: 2px;
+$shadow-color: rgba(0, 0, 0, 0.05);
+$shadow-1-down: 4px 4px 40px $shadow-color;
+$border-color-split: #f4f4f4;
+$border-color-base: #e5e5e5;
+$font-size-base: 13px;
+$text-color: #666;
+$hover-color: #f9f9fc;
+$dark-half: #494949;
+$purple: #d897eb;
+$shadow-1: 4px 4px 20px 0 rgba(0, 0, 0, 0.01);
+$shadow-2: 4px 4px 40px 0 rgba(0, 0, 0, 0.05);
+$shadow-default: 4px 4px 40px rgba(0, 0, 0, 0.06);
+$transition-ease-in: all 0.3s ease-out;
+$transition-ease-out: all 0.3s ease-out;
+$ease-in: ease-in;
+
+.paper {
+	padding: 8px;
+	background: white;
+	margin: 0 auto;
+	border-radius: $border-radius-base;
+	box-shadow: $shadow-default;
+	flex-wrap: wrap;
+	word-wrap: break-word;
+}
+
+.antd-form-custom {
+	margin-bottom: 20px;
+
+	& .ant-form-item {
+		margin-bottom: 1px;
+	}
+
+	& .ant-form-item-label {
+		padding: 2px 0;
+	}
+}
