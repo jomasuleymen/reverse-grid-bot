@@ -1,5 +1,5 @@
 import { RepositoriesModule } from '@/infrastructure/repositories/repositories.module';
-import { TradingBotsModules } from '@/infrastructure/trading-bots/trading-bots.module';
+import { TradingBotsModules } from '@/infrastructure/modules/trading-bots/trading-bots.module';
 import { Module } from '@nestjs/common';
 import { TradingBotsApplicationService } from './services/trading-bots.service';
 

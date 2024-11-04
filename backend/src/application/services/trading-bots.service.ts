@@ -6,9 +6,9 @@ import {
 import { TradingBotConfigEntity } from '@/infrastructure/entities/trading/trading-config.entity';
 import { BotConfigRepository } from '@/infrastructure/repositories/trading/trading-config.repo';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
-import { BybitSpotReverseGridBot } from '@/infrastructure/trading-bots/bybit/spot-reverse-grid-bot';
-import { TradingbotUserError } from '@/infrastructure/trading-bots/common/errors';
-import { TradingBotsService } from '@/infrastructure/trading-bots/trading-bots.service';
+import { BybitSpotReverseGridBot } from '@/infrastructure/modules/trading-bots/bybit/spot-reverse-grid-bot';
+import { TradingbotUserError } from '@/infrastructure/modules/trading-bots/common/errors';
+import { TradingBotsService } from '@/infrastructure/modules/trading-bots/trading-bots.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { validate } from 'class-validator';

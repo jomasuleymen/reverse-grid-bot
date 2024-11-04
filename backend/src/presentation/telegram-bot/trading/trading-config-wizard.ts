@@ -1,6 +1,6 @@
 import { MyContext, WIZARDS } from '@/domain/adapters/telegram.interface';
-import { UserEntity } from '@/infrastructure/entities/account/user.entity';
-import { UserRepository } from '@/infrastructure/repositories/account/user.repo';
+import { TelegramAccountEntity } from '@/infrastructure/entities/notification/telegram-account.entity';
+import { TelegramAccountRepository } from '@/infrastructure/repositories/account/telegram-account.repo';
 import { BotConfigRepository } from '@/infrastructure/repositories/trading/trading-config.repo';
 import { Action, Ctx, Wizard, WizardStep } from 'nestjs-telegraf';
 import { Markup } from 'telegraf';
@@ -14,15 +14,15 @@ import { FieldKey, formFieldConfig, TradingUpdateBase } from './common';
 export class EditConfigWizard extends TradingUpdateBase {
 	constructor(
 		private readonly botConfigRepo: BotConfigRepository,
-		private readonly userRepo: UserRepository,
+		private readonly telegramAccountRepo: TelegramAccountRepository,
 	) {
 		super();
 	}
 
 	private async fetchUser(ctx: MyContext) {
-		return (await this.userRepo.findByTelegramUserId(
+		return (await this.telegramAccountRepo.findByTelegramUserId(
 			ctx.from?.id!,
-		)) as UserEntity;
+		)) as TelegramAccountEntity;
 	}
 
 	private async fetchUserConfig(userId: number) {

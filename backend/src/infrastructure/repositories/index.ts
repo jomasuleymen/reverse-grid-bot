@@ -1,3 +1,4 @@
+import { TelegramAccountRepository } from './account/telegram-account.repo';
 import { UserRepository } from './account/user.repo';
 import { ExchangeCredentialsRepository } from './trading/exchange-credentials.repo';
 import { KLineRepository } from './trading/kline.repo';
@@ -8,4 +9,5 @@ export const REPOSITORIES = [
 	UserRepository,
 	BotConfigRepository,
 	ExchangeCredentialsRepository,
+	TelegramAccountRepository,
 ];

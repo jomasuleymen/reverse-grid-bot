@@ -1,4 +1,4 @@
-import { UserRepository } from '@/infrastructure/repositories/account/user.repo';
+import { TelegramAccountRepository } from '@/infrastructure/repositories/account/telegram-account.repo';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isNumber } from 'lodash';
@@ -15,7 +15,7 @@ export class TelegramService {
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly logger: LoggerService,
-		private readonly userRepo: UserRepository,
+		private readonly telegramAccountRepo: TelegramAccountRepository,
 		@InjectBot() public readonly bot: Telegraf,
 	) {
 		this.allowedUserIds = new Set(this.getAllowedUserIds());
@@ -57,7 +57,7 @@ export class TelegramService {
 	}
 
 	public async sendMessage(userId: number, message: string) {
-		const account = await this.userRepo.findById(userId);
+		const account = await this.telegramAccountRepo.findByUserId(userId);
 		if (!account) return;
 
 		try {

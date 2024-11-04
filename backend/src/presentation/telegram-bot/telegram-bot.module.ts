@@ -1,6 +1,6 @@
 import { ServicesModule } from '@/application/services.module';
 import { MyContext } from '@/domain/adapters/telegram.interface';
-import { UserRepository } from '@/infrastructure/repositories/account/user.repo';
+import { TelegramAccountRepository } from '@/infrastructure/repositories/account/telegram-account.repo';
 import { RepositoriesModule } from '@/infrastructure/repositories/repositories.module';
 import { TelegramModule } from '@/infrastructure/services/telegram/telegram.module';
 import TelegramService from '@/infrastructure/services/telegram/telegram.service';
@@ -18,7 +18,7 @@ import { TradingTelegramUpdate } from './trading/trading-update';
 export class TelegramBotModule implements OnModuleInit {
 	constructor(
 		@InjectBot() public readonly bot: Telegraf,
-		private readonly userRepo: UserRepository,
+		private readonly telegramAccountRepo: TelegramAccountRepository,
 		private readonly telegramService: TelegramService,
 	) {}
 
@@ -32,25 +32,13 @@ export class TelegramBotModule implements OnModuleInit {
 
 		const userId = ctx.from?.id;
 
-		// if (!userId || !this.telegramService.isUserAllowed(userId)) {
-		// 	await ctx.reply(`У вас нету доступа. user id: ${userId}`);
-		// 	return;
-		// }
-		if (!userId) {
+		let account = await this.telegramAccountRepo.findByTelegramUserId(
+			userId!,
+		);
+		if (!account) {
 			await ctx.reply(`У вас нету доступа. user id: ${userId}`);
 			return;
 		}
-
-		let user = await this.userRepo.findByTelegramUserId(userId!);
-		if (!user)
-			user = await this.userRepo.saveUser({
-				chatId: ctx.chat?.id,
-				telegramUserId: userId!,
-				firstName: ctx.from?.first_name!,
-				username: ctx.from?.username!,
-			});
-
-		ctx.user = user;
 
 		return await next();
 	}

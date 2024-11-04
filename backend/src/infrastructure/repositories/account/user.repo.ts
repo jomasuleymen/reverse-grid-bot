@@ -14,12 +14,8 @@ export class UserRepository {
 		return this.userRepo.findOneBy({ id: Equal(id) });
 	}
 
-	async findByChatId(chatId: number) {
-		return this.userRepo.findOneBy({ chatId: Equal(chatId) });
-	}
-
-	async findByTelegramUserId(userId: number) {
-		return this.userRepo.findOneBy({ telegramUserId: Equal(userId) });
+	async findByUsername(username: string) {
+		return this.userRepo.findOneBy({ username: Equal(username) });
 	}
 
 	async saveUser(payload: Partial<UserEntity>) {
