@@ -8,20 +8,21 @@
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "allowJs": false,
     "strict": true,
-    "skipLibCheck": false,
+    "skipLibCheck": true,
     "esModuleInterop": false,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "experimentalDecorators": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "noImplicitReturns": true,
     "noEmit": true,
     "baseUrl": ".",
     "types": ["vite/client", "@emotion/react/types/css-prop", "node"],
     "paths": {
       "@/*": ["src/*"]
-    },
+    }
   },
   "include": ["src/**/*"],
-	"exclude": ["node_modules", "dist", "build"],
+  "exclude": ["./node_modules/**/*", "node_modules/**", "dist", "build"]
 }

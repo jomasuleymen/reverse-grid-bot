@@ -1,56 +1,60 @@
-import { useNavigate, useLocation } from 'react-router-dom'
-import clsx from 'clsx'
+import { Layout, Menu, MenuProps } from 'antd'
+import { useMemo } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 
-import { GithubOctopusCat } from '@/components/GithubOctopusCat'
+const { Header } = Layout
+
 import { routes } from '@/router'
+import { useAuthStore } from '@/store/auth.store'
 
-const navbarList = routes.map((route) => ({
-  id: route.path,
-  label: route.label,
-  path: route.path,
-}))
+type MenuItem = Required<MenuProps>['items'][number]
 
-type Props = {}
+const normalizePath = (path: string) => path.replace(/\/+$/, '')
 
-export const Nav: React.FC<Props> = () => {
+export const Nav: React.FC = () => {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const logout = useAuthStore((store) => store.logout)
+
+  const leftNavbarItems = useMemo(() => {
+    const items: MenuItem[] = routes
+      .filter((route) => route.label)
+      .map((route) => ({
+        key: normalizePath(route.path), // Normalize each key
+        label: route.label,
+        onClick: () => navigate(route.path),
+      }))
+
+    return items
+  }, [])
+
+  const rightNavbarItems = useMemo(() => {
+    const items: MenuItem[] = [
+      {
+        key: 'logout',
+        label: 'Выход',
+        onClick: () => {
+          logout()
+        },
+      },
+    ]
+
+    return items
+  }, [])
+
+  const selectedKeys = useMemo(() => [normalizePath(pathname)], [pathname])
 
   return (
-    <nav className="fixed left-0 top-0 z-10 w-screen bg-gray-800">
-      <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
-        <div className="relative flex h-16 items-center justify-between overflow-x-auto overflow-y-hidden">
-          <div className="flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium text-green-600">
-            vite-react-ts
-          </div>
+    <Header className="flex px-0">
+      <Menu
+        className="flex-1"
+        theme="dark"
+        mode="horizontal"
+        items={leftNavbarItems}
+        selectedKeys={selectedKeys}
+      />
 
-          <div className="hidden flex-1 items-center justify-center sm:hidden sm:items-stretch sm:justify-start md:hidden lg:flex xl:flex">
-            <div className="sm:ml-6 sm:block">
-              <div className="flex select-none space-x-4">
-                {navbarList.map(({ path, label }) => (
-                  <button
-                    key={path}
-                    className={clsx(
-                      'flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium text-white hover:bg-gray-700',
-                      path === pathname && 'bg-gray-900',
-                      path !== pathname && 'text-gray-300',
-                    )}
-                    onClick={() => navigate(path)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="hidden flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium text-blue-600 sm:hidden md:hidden lg:flex xl:flex">
-            {`Current Routing Path: "${pathname}"`}
-          </div>
-        </div>
-      </div>
-
-      <GithubOctopusCat />
-    </nav>
+      <Menu theme="dark" mode="horizontal" items={rightNavbarItems} selectedKeys={selectedKeys} />
+    </Header>
   )
 }

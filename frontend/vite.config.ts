@@ -1,21 +1,22 @@
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 
-import React from '@vitejs/plugin-react-swc';
-import dotenv from 'dotenv';
-import type { ConfigEnv } from 'vite';
-import { defineConfig } from 'vite';
-import checker from 'vite-plugin-checker';
+import React from '@vitejs/plugin-react-swc'
+import dotenv from 'dotenv'
+import type { ConfigEnv, UserConfig } from 'vite'
+import { defineConfig } from 'vite'
+import checker from 'vite-plugin-checker'
 
-/**
- * https://vitejs.dev/config/
- */
-const baseConfig = {
+const baseConfig: UserConfig = {
   plugins: [React({ jsxImportSource: '@emotion/react' }), checker({ typescript: true })],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  build: {
+    emptyOutDir: true,
+    outDir: 'dist',
   },
 }
 

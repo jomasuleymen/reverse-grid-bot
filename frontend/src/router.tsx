@@ -1,49 +1,67 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 
 import { ErrorPage } from '@/pages/ErrorPage'
+import ProtectedRoute from './components/ProtectedRoute'
+import Loading from './components/Loading'
+
+const MainLayout = React.lazy(() => import('@/layout'))
+const TradingBotConfigs = React.lazy(() => import('@/pages/trading-bot/configs'))
+const TradingBotAccounts = React.lazy(() => import('@/pages/trading-bot/accounts'))
+const LoginPage = React.lazy(() => import('@/pages/login'))
 
 type Route = {
-  label: string
+  label?: string
   path: string
-  element: Promise<React.FC>
+  protected?: boolean
+  element: React.LazyExoticComponent<React.FC>
 }
 
 export const routes: Route[] = [
   {
-    label: 'Home',
-    path: '/home',
-    element: import('./pages/HomePage').then(({ HomePage }) => HomePage),
+    label: 'Конфигурации',
+    path: '/configs',
+    protected: true,
+    element: TradingBotConfigs, // Use extracted variable
   },
   {
-    label: 'About',
-    path: '/about',
-    element: import('./pages/AboutPage').then(({ AboutPage }) => AboutPage),
-  },
-  {
-    label: 'Users',
-    path: '/users',
-    element: import('./pages/UsersPage').then(({ UsersPage }) => UsersPage),
-  },
-  {
-    label: 'Test',
-    path: '/test',
-    element: import('./pages/TestPage').then(({ TestPage }) => TestPage),
+    label: 'Аккаунты',
+    path: '/accounts',
+    protected: true,
+    element: TradingBotAccounts, // Use extracted variable
   },
 ]
 
 const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
     path: '/',
-    lazy: () => import('@/layout').then(({ Layout }) => ({ Component: Layout })),
+    element: <MainLayout />,
     errorElement: <ErrorPage />,
     children: routes.map((route) => ({
       path: route.path,
-      lazy: () => route.element.then((Component) => ({ Component })),
+      element: (
+        <Suspense fallback={<h1>Загрузка...</h1>}>
+          {route.protected ? (
+            <ProtectedRoute>
+              <route.element />
+            </ProtectedRoute>
+          ) : (
+            <route.element />
+          )}
+        </Suspense>
+      ),
     })),
   },
 ])
 
 export const Router = () => {
-  return <RouterProvider router={router} fallbackElement={<h1>Loading...</h1>} />
+  return (
+    <Suspense fallback={<Loading />}>
+      <RouterProvider router={router} />
+    </Suspense>
+  )
 }
