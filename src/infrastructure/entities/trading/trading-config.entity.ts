@@ -1,4 +1,4 @@
-import { TradingBotAccountType } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { ExchangeCredentialsType } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { UserEntity } from '@/infrastructure/entities/account/user.entity';
 import { IsEnum, IsNumber, IsString } from 'class-validator';
 import {
@@ -26,15 +26,6 @@ export class TradingBotConfigEntity {
 	@IsNumber({}, { message: 'Объём сетки должен быть числом.' })
 	@Column({ type: 'real', nullable: true })
 	gridVolume: number;
-
-	@IsEnum(TradingBotAccountType, {
-		message: 'Режим аккаунта должен быть либо "Тестовый", либо "Реальный".',
-	})
-	@Column({
-		type: 'integer',
-		default: TradingBotAccountType.Testnet,
-	})
-	accountMode: TradingBotAccountType;
 
 	@IsString({ message: 'Символ должен быть строкой.' })
 	@Column({ nullable: true })

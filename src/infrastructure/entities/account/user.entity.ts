@@ -2,9 +2,11 @@ import {
 	Column,
 	Entity,
 	Index,
+	OneToMany,
 	OneToOne,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
+import { ExchangeCredentialsEntity } from '../trading/exchang-credentials.entity';
 import { TradingBotConfigEntity } from '../trading/trading-config.entity';
 
 @Entity('user')
@@ -30,4 +32,13 @@ export class UserEntity {
 		cascade: ['insert', 'update'],
 	})
 	botConfig: TradingBotConfigEntity;
+
+	@OneToMany(
+		() => ExchangeCredentialsEntity,
+		(exchangeAccount) => exchangeAccount.user,
+		{
+			cascade: ['insert', 'update'],
+		},
+	)
+	exchangeAccounts: ExchangeCredentialsEntity[];
 }

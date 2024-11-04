@@ -56,6 +56,15 @@ export class TelegramService {
 		return isNumber(userId) && this.allowedUserIds.has(userId);
 	}
 
+	public async sendMessage(userId: number, message: string) {
+		const account = await this.userRepo.findById(userId);
+		if (!account) return;
+
+		try {
+			await this.bot.telegram.sendMessage(account.chatId, message);
+		} catch (err) {}
+	}
+
 	public async updateBotCommands(): Promise<void> {
 		if (!this.bot) return;
 

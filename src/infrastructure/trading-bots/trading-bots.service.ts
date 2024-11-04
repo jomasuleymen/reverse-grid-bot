@@ -1,34 +1,18 @@
-import { TradingBotAccountType } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { TradingBotConfigEntity } from '../entities/trading/trading-config.entity';
-import LoggerService from '../services/logger/logger.service';
+import { ModuleRef } from '@nestjs/core';
 import { BybitSpotReverseGridBot } from './bybit/spot-reverse-grid-bot';
 
 @Injectable()
 export class TradingBotsService {
-	constructor(
-		private readonly configService: ConfigService,
-		private readonly loggerService: LoggerService,
-	) {}
+	constructor(private moduleRef: ModuleRef) {}
 
-	public async getBot(config: TradingBotConfigEntity) {
-		const bot = new BybitSpotReverseGridBot(
-			{
-				credentials: {
-					apiKey: this.configService.getOrThrow('bybit.api.key'),
-					apiSecret:
-						this.configService.getOrThrow('bybit.api.secret'),
-				},
-				config: {
-					...config,
-					isTestnet:
-						config.accountMode === TradingBotAccountType.Testnet,
-				},
-			},
-			this.loggerService,
-		);
+	public async getBot(exchange: ExchangeEnum) {
+		switch (exchange) {
+			case ExchangeEnum.Bybit:
+				return await this.moduleRef.resolve(BybitSpotReverseGridBot);
+		}
 
-		return bot;
+		throw new Error('Биржа не поддерживается');
 	}
 }

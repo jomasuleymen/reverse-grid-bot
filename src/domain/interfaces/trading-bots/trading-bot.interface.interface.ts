@@ -1,3 +1,5 @@
+import { IUser } from '../account/user.interface';
+import { ExchangeEnum } from '../exchanges/common.interface';
 import { WalletBalance } from './wallet.interface';
 
 export type TraidingBotOrder = {
@@ -13,18 +15,24 @@ export type TradingBotSnapshot = {
 	walletBalance: WalletBalance;
 };
 
-export type GridBotState = {
-	minPrice: number;
-	maxPrice: number;
-};
+export enum ExchangeCredentialsType {
+	Testnet = 1,
+	Real = 2,
+}
 
-export type SpotReverseGridBotConfig = {
-	tradingPair: string;
-	baseOrderSize: number;
-	orderIncrement: number;
-	minOpenGridCount: number;
-	takeProfitOnGrid?: number;
-};
+export interface ITradingBotConfig {
+	takeProfit: number;
+	gridStep: number;
+	gridVolume: number;
+	symbol: string;
+}
+
+export interface IExchangeCredentials {
+	type: ExchangeCredentialsType;
+	apiKey: string;
+	apiSecret: string;
+	exchange: ExchangeEnum;
+}
 
 export enum BotState {
 	Idle = 1,
@@ -34,7 +42,11 @@ export enum BotState {
 	Stopped = 5,
 }
 
-export enum TradingBotAccountType {
-	Testnet = 1,
-	Real = 2,
+export interface ITradingBot {
+	start(
+		config: ITradingBotConfig,
+		credentials: IExchangeCredentials,
+		user: IUser,
+	): Promise<void>;
+	stop(): Promise<void>;
 }

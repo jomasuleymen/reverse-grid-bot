@@ -1,4 +1,4 @@
-import { TradingBotAccountType } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { ExchangeCredentialsType } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { TradingBotConfigEntity } from '@/infrastructure/entities/trading/trading-config.entity';
 import { Markup } from 'telegraf';
 import {
@@ -8,7 +8,7 @@ import {
 
 type EditableFields = keyof Pick<
 	TradingBotConfigEntity,
-	'takeProfit' | 'gridStep' | 'gridVolume' | 'accountMode' | 'symbol'
+	'takeProfit' | 'gridStep' | 'gridVolume' | 'symbol'
 >;
 
 export const formFieldConfig: Record<
@@ -47,23 +47,23 @@ export const formFieldConfig: Record<
 		parse: (value) => Number(value),
 		humanReadable: (value) => Number(value).toString(),
 	},
-	accountMode: {
-		label: 'Режим аккаунта',
-		dbField: 'accountMode',
-		inputPrompt: 'Введите "Demo" или "Real time"',
-		validation: (value) => value === 'Demo' || value === 'Real time',
-		parse: (value) => {
-			return value == 'Demo'
-				? TradingBotAccountType.Testnet
-				: TradingBotAccountType.Real;
-		},
-		options: ['Demo', 'Real time'],
-		humanReadable: (value) => {
-			return value == TradingBotAccountType.Testnet
-				? 'Тестовый режим'
-				: 'Реальный режим';
-		},
-	},
+	// accountMode: {
+	// 	label: 'Режим аккаунта',
+	// 	dbField: 'accountMode',
+	// 	inputPrompt: 'Введите "Demo" или "Real time"',
+	// 	validation: (value) => value === 'Demo' || value === 'Real time',
+	// 	parse: (value) => {
+	// 		return value == 'Demo'
+	// 			? ExchangeCredentialsType.Testnet
+	// 			: ExchangeCredentialsType.Real;
+	// 	},
+	// 	options: ['Demo', 'Real time'],
+	// 	humanReadable: (value) => {
+	// 		return value == ExchangeCredentialsType.Testnet
+	// 			? 'Тестовый режим'
+	// 			: 'Реальный режим';
+	// 	},
+	// },
 	symbol: {
 		label: 'Символ',
 		dbField: 'symbol',

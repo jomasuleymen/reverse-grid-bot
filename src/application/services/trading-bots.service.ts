@@ -1,11 +1,16 @@
 import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
+import {
+	ExchangeCredentialsType,
+	IExchangeCredentials,
+} from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { TradingBotConfigEntity } from '@/infrastructure/entities/trading/trading-config.entity';
 import { BotConfigRepository } from '@/infrastructure/repositories/trading/trading-config.repo';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { BybitSpotReverseGridBot } from '@/infrastructure/trading-bots/bybit/spot-reverse-grid-bot';
-import { TradingbotUserError } from '@/infrastructure/trading-bots/common/error';
+import { TradingbotUserError } from '@/infrastructure/trading-bots/common/errors';
 import { TradingBotsService } from '@/infrastructure/trading-bots/trading-bots.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { validate } from 'class-validator';
 
 interface StartSpotReverserBotOptions {
@@ -19,6 +24,7 @@ export class TradingBotsApplicationService {
 
 	constructor(
 		private readonly botConfigRepo: BotConfigRepository,
+		private readonly configService: ConfigService,
 		private readonly tradingBotService: TradingBotsService,
 		private readonly loggerService: LoggerService,
 	) {}
@@ -55,12 +61,18 @@ export class TradingBotsApplicationService {
 			throw new Error('У вас уже есть запущенный бот.');
 		}
 
-		const bot = await this.tradingBotService.getBot(botConfig);
-		bot.setCallback(callback);
+		const bot = await this.tradingBotService.getBot(ExchangeEnum.Bybit);
+		const credentials: IExchangeCredentials = {
+			apiKey: this.configService.getOrThrow('bybit.api.key'),
+			apiSecret: this.configService.getOrThrow('bybit.api.secret'),
+			exchange: ExchangeEnum.Bybit,
+			type: ExchangeCredentialsType.Testnet,
+		};
+
 		this.bots[options.userId] = bot;
 
 		try {
-			await bot.start();
+			await bot.start(botConfig, credentials, { id: options.userId });
 			callback('Бот успешно запущен.');
 		} catch (err) {
 			delete this.bots[options.userId];
