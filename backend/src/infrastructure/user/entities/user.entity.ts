@@ -1,3 +1,4 @@
+import { ExchangeCredentialsEntity } from '@/infrastructure/exchanges/exchange-credentials/entites/exchange-credentials.entity';
 import { TelegramAccountEntity } from '@/infrastructure/notification/entities/telegram-account.entity';
 import { Exclude } from 'class-transformer';
 import {
@@ -7,8 +8,7 @@ import {
 	OneToOne,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
-import { ExchangeCredentialsEntity } from '../../trading-bots/entities/exchang-credentials.entity';
-import { TradingBotConfigEntity } from '../../trading-bots/entities/trading-config.entity';
+import { TradingBotConfigEntity } from '../../trading-bots/configurations/entities/trading-config.entity';
 
 @Entity('user')
 export class UserEntity {

@@ -1,4 +1,4 @@
-import { AuthGuard } from '@/common/guards/auth.guard';
+import { UseAuthorized } from '@/common/decorators/use-auth.decorator';
 import { LocalLoginGuard } from '@/common/guards/passport/login.guard';
 import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
@@ -11,13 +11,13 @@ export class AuthController {
 		return req.user;
 	}
 
-	@UseGuards(AuthGuard)
+	@UseAuthorized()
 	@Post('logout')
 	async logout(@Req() req: Request) {
 		return req.logout((err) => {});
 	}
 
-	@UseGuards(AuthGuard)
+	@UseAuthorized()
 	@Get('me')
 	async me(@Req() req: Request) {
 		return req.user;

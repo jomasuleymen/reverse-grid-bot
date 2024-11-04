@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { BinanceModule } from './binance/binance.module';
-import { BybitModule } from './bybit/bybit.module';
+import { ExchangeCredentialsModule } from './exchange-credentials/exchange-credentials.module';
+import { BinanceModule } from './modules/binance/binance.module';
+import { BybitModule } from './modules/bybit/bybit.module';
 
 @Module({
-	imports: [BinanceModule, BybitModule],
-	controllers: [],
+	imports: [ExchangeCredentialsModule, BinanceModule, BybitModule],
 	providers: [],
+	exports: [ExchangeCredentialsModule],
 })
 export class ExchangesModule {}

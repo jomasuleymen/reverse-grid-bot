@@ -9,8 +9,7 @@ import {
 	TraidingBotOrder,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import TelegramService from '@/infrastructure/services/telegram/telegram.service';
-import { Inject, Injectable, Scope } from '@nestjs/common';
-import { TradingbotUserError } from './errors';
+import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common';
 
 @Injectable({ scope: Scope.TRANSIENT })
 export abstract class BaseReverseGridBot implements ITradingBot {
@@ -70,7 +69,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		const isSymbolExists = await this.isExistsSymbol(this.config.symbol);
 		if (!isSymbolExists) {
-			throw new TradingbotUserError(
+			throw new BadRequestException(
 				`Тикер ${this.config.symbol} не найден.`,
 			);
 		}

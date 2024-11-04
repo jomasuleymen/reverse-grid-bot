@@ -1,11 +1,11 @@
 import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
+import { ITradingBot } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
-import { BybitSpotReverseGridBot } from '@/infrastructure/trading-bots/bybit/spot-reverse-grid-bot';
-import { TradingbotUserError } from '@/infrastructure/trading-bots/common/errors';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { ExchangeCredentialsService } from './exchange-credentials.service';
-import { TradingBotConfigsService } from './trading-bot-configs.service';
+import { ExchangeCredentialsService } from '../exchanges/exchange-credentials/exchange-credentials.service';
+import { BybitSpotReverseGridBot } from './bots/bybit/spot-reverse-grid-bot';
+import { TradingBotConfigsService } from './configurations/trading-configs.service';
 
 interface StartSpotReverserBotOptions {
 	credentialsId: number;
@@ -14,7 +14,7 @@ interface StartSpotReverserBotOptions {
 
 @Injectable()
 export class TradingBotService {
-	private readonly bots: Record<number, BybitSpotReverseGridBot> = {};
+	private readonly bots: Record<number, ITradingBot> = {};
 
 	constructor(
 		private readonly botConfigsService: TradingBotConfigsService,
@@ -26,7 +26,6 @@ export class TradingBotService {
 	async startReverseBot(
 		userId: number,
 		options: StartSpotReverserBotOptions,
-		callback: (msg: string) => void,
 	): Promise<void> {
 		if (this.bots[userId]) {
 			throw new BadRequestException('У вас уже есть запущенный бот.');
@@ -56,22 +55,13 @@ export class TradingBotService {
 
 		try {
 			await bot.start(botConfig, credentials, { id: userId });
-			callback('Бот успешно запущен.');
 		} catch (err) {
 			delete this.bots[userId];
 			this.loggerService.error('Ошибка при запуске бота:', err);
-			if (err instanceof TradingbotUserError) {
-				callback(err.message);
-			} else {
-				callback('Произошла ошибка при запуске бота.');
-			}
 		}
 	}
 
-	async stopReverseBot(
-		userId: number,
-		callback: (msg: string) => void,
-	): Promise<void> {
+	async stopReverseBot(userId: number): Promise<void> {
 		const bot = this.bots[userId];
 		if (!bot) {
 			throw new BadRequestException(
@@ -83,10 +73,8 @@ export class TradingBotService {
 
 		try {
 			await bot.stop();
-			callback('Бот успешно остановлен.');
 		} catch (err) {
 			this.loggerService.error('Ошибка при остановке бота:', err);
-			callback('Произошла ошибка при остановке бота.');
 		}
 	}
 

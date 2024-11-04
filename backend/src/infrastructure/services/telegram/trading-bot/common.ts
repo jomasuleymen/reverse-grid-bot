@@ -1,4 +1,4 @@
-import { TradingBotConfigEntity } from '@/infrastructure/trading-bots/entities/trading-config.entity';
+import { TradingBotConfigEntity } from '@/infrastructure/trading-bots/configurations/entities/trading-config.entity';
 
 type EditableFields = keyof Pick<
 	TradingBotConfigEntity,

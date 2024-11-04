@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Equal, Repository } from 'typeorm';
-import { ExchangeCredentialsEntity } from './entities/exchang-credentials.entity';
+import { ExchangeCredentialsEntity } from './entites/exchange-credentials.entity';
 
 @Injectable()
 export class ExchangeCredentialsService {

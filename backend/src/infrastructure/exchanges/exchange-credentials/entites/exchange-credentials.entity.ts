@@ -7,10 +7,10 @@ import {
 	ManyToOne,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
-import { UserEntity } from '../../user/entities/user.entity';
 import { Exclude } from 'class-transformer';
+import { UserEntity } from '@/infrastructure/user/entities/user.entity';
 
-@Entity('exchange_account')
+@Entity('exchange_credentials')
 export class ExchangeCredentialsEntity {
 	@PrimaryGeneratedColumn()
 	id: number;

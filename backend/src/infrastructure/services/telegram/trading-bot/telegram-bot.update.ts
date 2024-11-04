@@ -1,7 +1,7 @@
 import { MyContext } from '@/domain/adapters/telegram.interface';
 import { TelegramPreferencesService } from '@/infrastructure/notification/telegram-preferences.service';
 import TelegramService from '@/infrastructure/services/telegram/telegram.service';
-import { TradingBotConfigsService } from '@/infrastructure/trading-bots/trading-bot-configs.service';
+import { TradingBotConfigsService } from '@/infrastructure/trading-bots/configurations/trading-configs.service';
 import { TradingBotService } from '@/infrastructure/trading-bots/trading-bots.service';
 import {
 	Action,
@@ -12,6 +12,7 @@ import {
 	Update,
 	Use,
 } from 'nestjs-telegraf';
+import LoggerService from '../../logger/logger.service';
 import { CALLBACK_ACTIONS, TradingUpdateBase } from './common';
 
 const BOT_COMMANDS = {
@@ -26,6 +27,7 @@ export class TradingBotUpdate extends TradingUpdateBase {
 		private readonly telegramService: TelegramService,
 		private readonly telegramPreferencesService: TelegramPreferencesService,
 		private readonly tradingBotService: TradingBotService,
+		private readonly loggerService: LoggerService,
 	) {
 		super();
 		this.telegramService.addMyCommands([
@@ -43,7 +45,11 @@ export class TradingBotUpdate extends TradingUpdateBase {
 		let account =
 			await this.telegramPreferencesService.findByTelegramUserId(userId!);
 		if (!account) {
-			await ctx.reply(`У вас нету доступа. user id: ${userId}`);
+			this.loggerService.warn('Telegram bot access denied', {
+				from: ctx.from,
+				chat: ctx.chat,
+			});
+			await ctx.reply(`У вас нету доступа. Свяжитесь с разработчиком.`);
 			return;
 		}
 

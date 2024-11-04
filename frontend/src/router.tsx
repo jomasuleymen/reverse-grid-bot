@@ -2,8 +2,8 @@ import React, { Suspense } from 'react'
 import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 
 import { ErrorPage } from '@/pages/ErrorPage'
-import ProtectedRoute from './components/ProtectedRoute'
 import Loading from './components/Loading'
+import ProtectedRoute from './components/ProtectedRoute'
 
 const MainLayout = React.lazy(() => import('@/layout'))
 const TradingBotConfigs = React.lazy(() => import('@/pages/trading-bot/configs'))
@@ -25,8 +25,8 @@ export const routes: Route[] = [
     element: TradingBotConfigs, // Use extracted variable
   },
   {
-    label: 'Аккаунты',
-    path: '/accounts',
+    label: 'Аккаунты бирж',
+    path: '/exchange-credentials',
     protected: true,
     element: TradingBotAccounts, // Use extracted variable
   },
