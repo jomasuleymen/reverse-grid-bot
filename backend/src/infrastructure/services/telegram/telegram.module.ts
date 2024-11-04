@@ -1,5 +1,5 @@
 import { MyContext } from '@/domain/adapters/telegram.interface';
-import { RepositoriesModule } from '@/infrastructure/repositories/repositories.module';
+import { NotificationModule } from '@/infrastructure/notification/notification.module';
 import { Module, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectBot, TelegrafModule } from 'nestjs-telegraf';
@@ -8,7 +8,7 @@ import { TelegramService } from './telegram.service';
 
 @Module({
 	imports: [
-		RepositoriesModule,
+		NotificationModule,
 		TelegrafModule.forRootAsync({
 			inject: [ConfigService],
 			useFactory: (configService: ConfigService) => ({
@@ -27,6 +27,6 @@ export class TelegramModule implements OnModuleDestroy {
 	constructor(@InjectBot() private bot: Telegraf<MyContext>) {}
 
 	onModuleDestroy() {
-		this.bot.stop();
+		this.bot?.stop?.();
 	}
 }

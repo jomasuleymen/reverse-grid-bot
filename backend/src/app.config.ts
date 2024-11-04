@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ValidationException } from "./infrastructure/common/exceptions/validation.exceptions";
+import { ValidationException } from "./common/exceptions/validation.exceptions";
 
 export const configApp = async (app: INestApplication<any>) => {
 	const configService = app.get<ConfigService>(ConfigService);

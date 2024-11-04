@@ -12,7 +12,7 @@ const infraPath = path.resolve('src/infrastructure');
 export const appDataSource = new DataSource({
 	type: 'better-sqlite3',
 	database: path.resolve('data.sqlite'),
-	entities: [path.join(infraPath, 'entities/**/*.entity{.ts,.js}')],
+	entities: [path.join(infraPath, '**/*.entity{.ts,.js}')],
 	migrations: [path.join(infraPath, 'migrations/**/*.ts')],
 	namingStrategy: new SnakeNamingStrategy(),
 	synchronize: false,
