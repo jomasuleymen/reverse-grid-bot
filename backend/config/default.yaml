@@ -1,0 +1,22 @@
+binance:
+    api:
+        key: 
+        secret: 
+
+bybit:
+    api:
+        key: 
+        secret: 
+
+telegram:
+    bot:
+        token: 
+    allowedUserIds:
+        - 
+
+logger:
+    type: local # local | axiom
+
+    axiom:
+        token: 
+        dataset: 
