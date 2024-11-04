@@ -15,7 +15,7 @@ export class TelegramService {
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly logger: LoggerService,
-		private readonly telegramAccountsService: TelegramPreferencesService,
+		private readonly telegramPreferencesService: TelegramPreferencesService,
 		@InjectBot() public readonly bot: Telegraf,
 	) {
 		this.allowedUserIds = new Set(this.getAllowedUserIds());
@@ -59,7 +59,7 @@ export class TelegramService {
 	public async sendMessage(userId: number, message: string) {
 		if (!this.bot) return;
 
-		const account = await this.telegramAccountsService.findByUserId(userId);
+		const account = await this.telegramPreferencesService.findByUserId(userId);
 		if (!account) return;
 
 		try {

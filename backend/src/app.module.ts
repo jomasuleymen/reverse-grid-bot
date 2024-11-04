@@ -6,7 +6,7 @@ import passport from 'passport';
 import { WEEK } from 'time-constants';
 import { getConfigModuleOptions } from './configs/config-service';
 import { ExchangesModule } from './infrastructure/exchanges/exchanges.module';
-import { TradingBotsModules } from './infrastructure/trading-bots/trading-bots.module';
+import { TradingBotModule } from './infrastructure/trading-bots/trading-bots.module';
 import { AuthModule } from './infrastructure/auth/auth.module';
 import { CustomLoggerModule } from './infrastructure/services/logger/logger.module';
 import { TelegramModule } from './infrastructure/services/telegram/telegram.module';
@@ -26,7 +26,7 @@ import { getTypeOrmModuleOptions } from './configs/typeorm';
 		AuthModule,
 
 		ExchangesModule,
-		TradingBotsModules,
+		TradingBotModule,
 
 		CustomLoggerModule,
 

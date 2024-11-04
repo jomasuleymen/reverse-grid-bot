@@ -17,22 +17,3 @@ export class SessionExpiredException extends BadRequestException {
 		});
 	}
 }
-
-export class EmailNotVerifiedException extends BadRequestException {
-	constructor() {
-		super({
-			message: 'Email has not been verified',
-			type: 'EmailNotVerifiedException',
-		});
-	}
-}
-
-export class SpecialistNotVerifiedException extends BadRequestException {
-	constructor() {
-		super({
-			message:
-				'Specialist has not been verified. Please wait for the admin to verify your account.',
-			type: 'SpecialistNotVerifiedException',
-		});
-	}
-}

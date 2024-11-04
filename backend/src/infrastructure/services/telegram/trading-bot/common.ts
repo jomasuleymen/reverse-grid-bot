@@ -1,5 +1,4 @@
 import { TradingBotConfigEntity } from '@/infrastructure/trading-bots/entities/trading-config.entity';
-import { Markup } from 'telegraf';
 
 type EditableFields = keyof Pick<
 	TradingBotConfigEntity,

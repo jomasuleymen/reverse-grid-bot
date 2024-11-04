@@ -11,7 +11,7 @@ const BOT_COMMANDS = {
 	EDIT_CONFIG: 'editconfig',
 };
 @Update()
-export class TradingTelegramUpdate extends TradingUpdateBase {
+export class TradingBotUpdate extends TradingUpdateBase {
 	constructor(
 		private readonly botConfigService: TradingBotConfigsService,
 		private readonly telegramService: TelegramService,
