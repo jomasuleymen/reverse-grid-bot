@@ -11,7 +11,7 @@ import {
 
 export type TCreateExchangeCredentialsForm = CreateExchangeCredentials
 
-export const CompanyFormItems: FormItemProps<TCreateExchangeCredentialsForm>[] = [
+export const ExchangeCredentialsFormItems: FormItemProps<TCreateExchangeCredentialsForm>[] = [
   {
     label: 'Биржа',
     name: 'exchange',
@@ -70,7 +70,7 @@ const TopBar: React.FC<TopBarProps> = ({ queryKey }) => {
           title="Добавить аккаунт"
           onSubmit={onSubmit}
           queryKey={queryKey}
-          formItems={CompanyFormItems}
+          formItems={ExchangeCredentialsFormItems}
           parseError={(error: { message: string }) => {
             return error.message
           }}

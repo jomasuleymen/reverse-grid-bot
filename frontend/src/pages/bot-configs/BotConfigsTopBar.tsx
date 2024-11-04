@@ -8,7 +8,7 @@ import { CreateTradingBotConfig } from '@/services/trading-bot.service'
 
 export type TCreateTradingBotConfigForm = CreateTradingBotConfig
 
-export const CompanyFormItems: FormItemProps<TCreateTradingBotConfigForm>[] = [
+export const BotConfigFormItems: FormItemProps<TCreateTradingBotConfigForm>[] = [
   {
     label: 'Тикер',
     name: 'symbol',
@@ -57,7 +57,7 @@ const TopBar: React.FC<TopBarProps> = ({ queryKey }) => {
           title="Добавить настройку"
           onSubmit={onSubmit}
           queryKey={queryKey}
-          formItems={CompanyFormItems}
+          formItems={BotConfigFormItems}
           parseError={(error: { message: string }) => {
             return error.message
           }}

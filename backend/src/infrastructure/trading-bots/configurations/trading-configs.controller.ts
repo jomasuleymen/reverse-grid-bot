@@ -1,7 +1,15 @@
 import { UseAuthorized } from '@/common/decorators/use-auth.decorator';
 import UseSession from '@/common/decorators/use-session.decorator';
 import { UserSession } from '@/infrastructure/auth/dto/session-user.dto';
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Param,
+	Post,
+	Put,
+} from '@nestjs/common';
 import { CreateBotConfigDto } from './dto/create-config.dto';
 import { TradingBotConfigsService } from './trading-configs.service';
 
@@ -29,5 +37,14 @@ export class TradingBotConfigsController {
 		@UseSession() user: UserSession,
 	) {
 		return await this.botConfigsSerice.delete(+id);
+	}
+
+	@Put(':id')
+	async updateConfig(
+		@Param('id') id: string,
+		@Body() body: CreateBotConfigDto,
+		@UseSession() user: UserSession,
+	) {
+		return await this.botConfigsSerice.update(+id, body);
 	}
 }

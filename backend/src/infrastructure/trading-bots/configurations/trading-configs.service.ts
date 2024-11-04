@@ -30,6 +30,12 @@ export class TradingBotConfigsService {
 		});
 	}
 
+	async update(id: number, dto: CreateBotConfigDto) {
+		return await this.botConfigRepo.update(id, {
+			...dto,
+		});
+	}
+
 	async delete(id: number) {
 		return await this.botConfigRepo.delete(id);
 	}

@@ -51,18 +51,15 @@ interface Props {
   queryKey: string[]
 }
 
-const CompaniesTable: React.FC<Props> = ({ queryKey }) => {
+const CredentialsTable: React.FC<Props> = ({ queryKey }) => {
   return (
     <DataTable
-      key="Companies-table"
+      key="exchange-credentials-table"
       fetchData={SERVICES.EXCHANGE.CREDENTIALS.fetchAll}
       queryKey={queryKey}
       parseDataSource={parseDataSource}
       columns={getColumns(queryKey)}
       tableProps={{
-        // expandable: {
-        //   expandedRowRender: (record: ColumnType) => getCompanyDetails(record),
-        // },
         style: {
           width: 'max-content',
           margin: '0 auto',
@@ -72,4 +69,4 @@ const CompaniesTable: React.FC<Props> = ({ queryKey }) => {
   )
 }
 
-export default memo(CompaniesTable)
+export default memo(CredentialsTable)

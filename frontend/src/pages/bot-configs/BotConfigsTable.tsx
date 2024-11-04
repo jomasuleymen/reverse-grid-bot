@@ -3,9 +3,11 @@ import DeleteItemModal from '@/components/DeleteItemModal'
 import { ColumnsType } from 'antd/es/table'
 import React, { memo } from 'react'
 
+import UpsertModalForm from '@/components/UpsertModalForm'
 import { SERVICES } from '@/services'
 import { TradingBotConfig } from '@/services/trading-bot.service'
 import { Space } from 'antd'
+import { BotConfigFormItems, TCreateTradingBotConfigForm } from './BotConfigsTopBar'
 
 type ColumnType = TradingBotConfig & {
   key: number
@@ -51,18 +53,20 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
           onDelete={() => SERVICES.TRADING_BOT.CONFIGS.deleteOne(record.id)}
           invalidateQueryKey={queryKey}
         />
-        {/* <UpsertModalForm
+        <UpsertModalForm
           buttonText="Изменить"
-          title="Изменить компанию"
-          onSubmit={(data: TCopmanyForm) => updateCompany(record._id, data)}
+          title="Изменить аккаунт"
+          onSubmit={(data: TCreateTradingBotConfigForm) =>
+            SERVICES.TRADING_BOT.CONFIGS.update(record.id, data)
+          }
           queryKey={queryKey}
-          formItems={CompanyFormItems}
+          formItems={BotConfigFormItems}
           parseError={(error: { message: string }) => {
             return error.message
           }}
           update
           initialValues={record}
-        /> */}
+        />
       </Space>
     ),
     align: 'center',
@@ -73,10 +77,10 @@ interface Props {
   queryKey: string[]
 }
 
-const CompaniesTable: React.FC<Props> = ({ queryKey }) => {
+const BotConfigsTable: React.FC<Props> = ({ queryKey }) => {
   return (
     <DataTable
-      key="Companies-table"
+      key="bot-configs-table"
       fetchData={SERVICES.TRADING_BOT.CONFIGS.fetchAll}
       queryKey={queryKey}
       parseDataSource={parseDataSource}
@@ -91,4 +95,4 @@ const CompaniesTable: React.FC<Props> = ({ queryKey }) => {
   )
 }
 
-export default memo(CompaniesTable)
+export default memo(BotConfigsTable)

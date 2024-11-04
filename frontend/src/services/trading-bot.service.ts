@@ -22,6 +22,10 @@ const CONFIGS_API = {
     return await $api.delete(`${TRADING_BOT_CONFIGS_ENDPOINT}/${id}`).then((res) => res.data)
   },
 
+  async update(id: number, data: CreateTradingBotConfig) {
+    return await $api.put(`${TRADING_BOT_CONFIGS_ENDPOINT}/${id}`, data).then((res) => res.data)
+  },
+
   async create(data: CreateTradingBotConfig) {
     return await $api.post(TRADING_BOT_CONFIGS_ENDPOINT, data).then((res) => res.data)
   },
