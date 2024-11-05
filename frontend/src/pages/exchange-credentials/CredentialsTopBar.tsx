@@ -42,14 +42,14 @@ export const ExchangeCredentialsFormItems: FormItemProps<TCreateExchangeCredenti
     name: 'apiKey',
     rules: [{ required: true }],
     required: true,
-    children: <Input />,
+    children: <Input.Password />,
   },
   {
     label: 'Api secret',
     name: 'apiSecret',
     rules: [{ required: true }],
     required: true,
-    children: <Input />,
+    children: <Input.Password />,
   },
 ]
 

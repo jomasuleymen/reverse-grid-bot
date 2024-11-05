@@ -8,6 +8,6 @@ import { TradingBotConfigsService } from './trading-configs.service';
 	imports: [TypeOrmModule.forFeature([TradingBotConfigEntity])],
 	controllers: [TradingBotConfigsController],
 	providers: [TradingBotConfigsService],
-	exports: [TradingBotConfigsService],
+	exports: [TypeOrmModule, TradingBotConfigsService],
 })
 export class TradingConfigurationsModule {}

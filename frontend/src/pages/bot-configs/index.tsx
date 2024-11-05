@@ -3,7 +3,7 @@ import React from 'react'
 import BotConfigsTable from './BotConfigsTable'
 import BotConfigsTopBar from './BotConfigsTopBar'
 
-export const TRADING_BOT_QUERY_KEY = ['trading-bot-configs']
+export const TRADING_BOT_CONFIGS_QUERY_KEY = ['trading-bot-configs']
 
 const TradingBotConfigs: React.FC = () => {
   return (

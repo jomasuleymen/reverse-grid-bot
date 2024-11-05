@@ -1,19 +1,38 @@
 import Block from '@/components/Block/Block'
+import { TRADING_BOT_CONFIGS_QUERY_KEY } from '@/pages/bot-configs'
+import { BotConfigFormItems } from '@/pages/bot-configs/BotConfigsTopBar'
 import { TRADING_BOT_CREDENTIALS_QUERY_KEY } from '@/pages/exchange-credentials'
 import { SERVICES } from '@/services'
 import { ExchangeCredentials } from '@/services/exchanges.service'
-import { TradingBotConfig } from '@/services/trading-bot.service'
-import { useQuery } from '@tanstack/react-query'
-import { Button, Col, Modal, Radio, Row, Select, Space } from 'antd'
+import { IStartBotOptions, TradingBotConfig } from '@/services/trading-bot.service'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Alert, Button, Col, Form, FormItemProps, Modal, Row, Select, Space } from 'antd'
 import React, { useState } from 'react'
 
-type Props = {}
+const getFormItem = (item: FormItemProps) => {
+  return (
+    <Form.Item
+      key={item.name?.toString()}
+      label={item.label}
+      name={item.name}
+      rules={item.rules}
+      children={item.children}
+      style={{ flex: 1 }}
+      {...item}
+    />
+  )
+}
 
-const StartBotModal: React.FC<Props> = ({}) => {
-  const [modalOpen, setModalOpen] = useState(false)
+const StartBotModal: React.FC = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [errors, setErrors] = useState<string[] | null>(null)
+  const [form] = Form.useForm()
 
-  const { isPending, isSuccess, data } = useQuery<[ExchangeCredentials[], TradingBotConfig[]]>({
-    queryKey: TRADING_BOT_CREDENTIALS_QUERY_KEY,
+  const queryClient = useQueryClient()
+
+  // Fetch credentials and configs
+  const { isFetching, isSuccess, data } = useQuery<[ExchangeCredentials[], TradingBotConfig[]]>({
+    queryKey: [...TRADING_BOT_CREDENTIALS_QUERY_KEY, ...TRADING_BOT_CONFIGS_QUERY_KEY],
     queryFn: () =>
       Promise.all([
         SERVICES.EXCHANGE.CREDENTIALS.fetchAll(),
@@ -25,53 +44,137 @@ const StartBotModal: React.FC<Props> = ({}) => {
   const credentials = isSuccess ? data[0] : []
   const configs = isSuccess ? data[1] : []
 
-  const handleCancel = () => {
-    setModalOpen(false)
+  // Mutation for starting the bot
+  const { mutate: startBot, isPending: isSubmitting } = useMutation({
+    mutationFn: (formData: IStartBotOptions) => SERVICES.TRADING_BOT.startBot(formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trading-bots'] })
+      setIsModalOpen(false)
+    },
+    onError: (error) => {
+      setErrors(['Failed to start bot. Please try again.'])
+    },
+  })
+
+  const handleTemplateSelect = (value: number) => {
+    const selectedConfig = configs.find((config) => config.id === value)
+    if (selectedConfig) {
+      form.setFieldsValue({
+        baseCurrency: selectedConfig.baseCurrency,
+        quoteCurrency: selectedConfig.quoteCurrency,
+        gridStep: selectedConfig.gridStep,
+        gridVolume: selectedConfig.gridVolume,
+        takeProfit: selectedConfig.takeProfit,
+      })
+    }
   }
+
+  const onFinish = (values: IStartBotOptions) => {
+    startBot(values)
+  }
+
+  const handleOpenModal = () => {
+    setIsModalOpen(true)
+    setErrors(null)
+  }
+
+  const handleCancel = () => {
+    setIsModalOpen(false)
+    setErrors(null)
+    form.resetFields()
+  }
+
+  const renderBotDetails = (config: TradingBotConfig) => (
+    <>
+      <b>Символ:</b> {config.baseCurrency + config.quoteCurrency}
+      <br />
+      <b>Объем сетки:</b> {config.gridVolume + ' ' + config.baseCurrency}
+      <br />
+      <b>Шаг сетки:</b> {config.gridStep + ' ' + config.quoteCurrency}
+      <br />
+      <b>Тейк-профит:</b> {config.takeProfit+ ' ' + config.quoteCurrency}
+    </>
+  )
 
   return (
     <>
       <Block transparency className="max-w-full">
-        <Button onClick={() => setModalOpen(true)} type="primary">
+        <Button onClick={handleOpenModal} type="primary">
           Новый бот
         </Button>
       </Block>
 
-      {modalOpen && (
-        <Modal
-          title={'TITLE'}
-          open={modalOpen}
-          centered={true}
-          footer={
-            <Row align="middle" justify="end" gutter={[10, 10]}>
-              <Col>
-                <Button htmlType="button" onClick={handleCancel}>
-                  Отменить
-                </Button>
-              </Col>
-              <Col>
-                <Button type="primary" htmlType="submit" loading={isPending}>
-                  Запускать
-                </Button>
-              </Col>
-            </Row>
-          }
-          closeIcon={false}
-        >
-          <Select className="w-full">
-            {credentials.map((credential) => (
-              <Select.Option>{`${credential.exchange} - ${credential.type}`}</Select.Option>
+      <Modal
+        title="Запустить бота"
+        open={isModalOpen}
+        onCancel={handleCancel}
+        footer={null}
+        centered
+      >
+        <Form layout="vertical" onFinish={onFinish} form={form}>
+          <Form.Item label="Учетные данные" name="credentialsId" rules={[{ required: true }]}>
+            <Select placeholder="Выберите учетные данные" loading={isFetching}>
+              {credentials.map((credential) => (
+                <Select.Option key={credential.id} value={credential.id}>
+                  {`${credential.exchange} - ${credential.type}`}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Select
+            placeholder="Применить шаблона"
+            className="w-full mb-4"
+            labelRender={(value) => {
+              return 'Применить шаблона'
+            }}
+            onSelect={handleTemplateSelect}
+          >
+            {configs.map((config) => (
+              <Select.Option key={config.id} value={config.id}>
+                {renderBotDetails(config)}
+              </Select.Option>
             ))}
           </Select>
-          <Radio.Group onChange={() => {}}>
-            <Space direction="vertical">
-              {configs.map((config) => (
-                <Radio value={config.id}>{config.symbol}</Radio>
-              ))}
-            </Space>
-          </Radio.Group>
-        </Modal>
-      )}
+
+          {BotConfigFormItems.map((item, idx) =>
+            Array.isArray(item) ? (
+              <Space style={{ display: 'flex', width: '100%' }} key={'items-' + idx}>
+                {item.map(getFormItem)}
+              </Space>
+            ) : (
+              getFormItem(item)
+            ),
+          )}
+
+          {errors && (
+            <Alert
+              message={
+                <ul>
+                  {errors.map((error, idx) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              }
+              type="error"
+              style={{ marginBottom: '20px' }}
+            />
+          )}
+
+          <Row justify="end" gutter={10}>
+            <Col>
+              <Button onClick={handleCancel} disabled={isSubmitting}>
+                Отменить
+              </Button>
+            </Col>
+            <Col>
+              <Button type="primary" htmlType="submit" loading={isSubmitting}>
+                Запускать
+              </Button>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
     </>
   )
 }

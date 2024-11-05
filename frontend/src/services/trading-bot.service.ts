@@ -9,11 +9,23 @@ export type TradingBotConfig = {
   takeProfit: number
   gridStep: number
   gridVolume: number
-  symbol: string
+  baseCurrency: string
+  quoteCurrency: string
+  createdAt: string
+  stoppedAt: string
+}
+
+export enum TradingBotState {
+  Idle = 1,
+  Initializing = 2,
+  Running = 3,
+  Stopping = 4,
+  Stopped = 5,
 }
 
 export type TradingBot = {
   id: number
+  state: TradingBotState
 } & Omit<TradingBotConfig, 'id'> &
   Omit<ExchangeCredentials, 'id'>
 
@@ -37,8 +49,13 @@ const CONFIGS_API = {
   },
 }
 
-interface ITradingBotFilter {
+export interface ITradingBotFilter {
   isActive?: boolean
+}
+
+export interface IStartBotOptions {
+  credentialsId: number
+  configId: number
 }
 
 export const TRADING_BOT_API = {
@@ -46,8 +63,12 @@ export const TRADING_BOT_API = {
 
   async fetchAll(filter?: ITradingBotFilter) {
     return await $api
-      .get<TradingBot[]>(TRADING_BOT_ENDPOINT, { data: filter })
+      .get<TradingBot[]>(TRADING_BOT_ENDPOINT, { params: filter })
       .then((res) => res.data)
+  },
+
+  async startBot(options: IStartBotOptions) {
+    return await $api.post<any>(`${TRADING_BOT_ENDPOINT}/start`, options).then((res) => res.data)
   },
 
   async stopBot(botId: number) {

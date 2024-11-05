@@ -1,5 +1,5 @@
+import ConfirmModal from '@/components/ConfirmModal'
 import DataTable from '@/components/DataTable'
-import DeleteItemModal from '@/components/DeleteItemModal'
 import { ColumnsType } from 'antd/es/table'
 import React, { memo } from 'react'
 
@@ -7,7 +7,7 @@ import UpsertModalForm from '@/components/UpsertModalForm'
 import { SERVICES } from '@/services'
 import { TradingBotConfig } from '@/services/trading-bot.service'
 import { Space } from 'antd'
-import { TRADING_BOT_QUERY_KEY } from '.'
+import { TRADING_BOT_CONFIGS_QUERY_KEY } from '.'
 import { BotConfigFormItems, TCreateTradingBotConfigForm } from './BotConfigsTopBar'
 
 type ColumnType = TradingBotConfig & {
@@ -25,8 +25,13 @@ const parseDataSource = (data: TradingBotConfig[]): ColumnType[] => {
 
 const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
   {
-    title: 'Тикер',
-    dataIndex: 'symbol',
+    title: 'Базовая валюта',
+    dataIndex: 'baseCurrency',
+    align: 'center',
+  },
+  {
+    title: 'Котируемая валюта',
+    dataIndex: 'quoteCurrency',
     align: 'center',
   },
   {
@@ -49,10 +54,14 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     key: 'action',
     render: (_, record: ColumnType) => (
       <Space>
-        <DeleteItemModal
-          modalTitle={`Удалить настройку?`}
-          onDelete={() => SERVICES.TRADING_BOT.CONFIGS.deleteOne(record.id)}
+        <ConfirmModal
+          modalTitle="Удалить настройку?"
+          onOk={() => SERVICES.TRADING_BOT.CONFIGS.deleteOne(record.id)}
           invalidateQueryKey={queryKey}
+          actionText="Удалить"
+          cancelText="Отмена"
+          okText="Удалить"
+          okType="danger"
         />
         <UpsertModalForm
           buttonText="Изменить"
@@ -80,9 +89,9 @@ const BotConfigsTable: React.FC<Props> = ({}) => {
   return (
     <DataTable
       fetchData={SERVICES.TRADING_BOT.CONFIGS.fetchAll}
-      queryKey={TRADING_BOT_QUERY_KEY}
+      queryKey={TRADING_BOT_CONFIGS_QUERY_KEY}
       parseDataSource={parseDataSource}
-      columns={getColumns(TRADING_BOT_QUERY_KEY)}
+      columns={getColumns(TRADING_BOT_CONFIGS_QUERY_KEY)}
       tableProps={{
         style: {
           width: 'max-content',

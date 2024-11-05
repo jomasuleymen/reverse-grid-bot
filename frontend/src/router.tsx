@@ -4,6 +4,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { ErrorPage } from '@/pages/ErrorPage'
 import Loading from './components/Loading'
 import ProtectedRoute from './components/ProtectedRoute'
+import ScreenLoading from './components/ScreenLoading'
 
 const MainLayout = React.lazy(() => import('@/layout'))
 const TradingBotConfigs = React.lazy(() => import('@/pages/bot-configs'))
@@ -51,7 +52,7 @@ const router = createBrowserRouter([
     children: routes.map((route) => ({
       path: route.path,
       element: (
-        <Suspense fallback={<h1>Загрузка...</h1>}>
+        <Suspense fallback={<ScreenLoading />}>
           {route.protected ? (
             <ProtectedRoute>
               <route.element />

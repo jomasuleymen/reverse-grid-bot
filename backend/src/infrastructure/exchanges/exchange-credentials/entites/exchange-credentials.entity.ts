@@ -1,14 +1,16 @@
 import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
 import { ExchangeCredentialsType } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { TradingBotEntity } from '@/infrastructure/trading-bots/entities/trading-bots.entity';
+import { UserEntity } from '@/infrastructure/user/entities/user.entity';
+import { Exclude } from 'class-transformer';
 import {
 	Column,
 	Entity,
 	Index,
 	ManyToOne,
+	OneToMany,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Exclude } from 'class-transformer';
-import { UserEntity } from '@/infrastructure/user/entities/user.entity';
 
 @Entity('exchange_credentials')
 export class ExchangeCredentialsEntity {
@@ -43,4 +45,9 @@ export class ExchangeCredentialsEntity {
 		onUpdate: 'CASCADE',
 	})
 	user: UserEntity;
+
+	@OneToMany(() => TradingBotEntity, (tradingBot) => tradingBot.credentials, {
+		cascade: ['insert', 'update'],
+	})
+	tradingBots: TradingBotEntity[];
 }

@@ -9,7 +9,7 @@ const ActiveTradingBots: React.FC<Props> = ({}) => {
 
   return (
     <Block title="Активные" className="max-w-full">
-      <TradingBotsTable queryKey={queryKey} />
+      <TradingBotsTable queryKey={queryKey} options={{ isActive: true }} />
     </Block>
   )
 }

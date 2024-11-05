@@ -1,9 +1,14 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class Init1730753049642 implements MigrationInterface {
-    name = 'Init1730753049642'
+export class Init1730838365166 implements MigrationInterface {
+    name = 'Init1730838365166'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE TABLE "trading_bot" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "type" text NOT NULL, "exchange" text NOT NULL, "base_currency" varchar NOT NULL, "quote_currency" varchar NOT NULL, "take_profit" real NOT NULL, "grid_step" real NOT NULL, "grid_volume" real NOT NULL, "state" integer NOT NULL DEFAULT (1), "user_id" integer NOT NULL, "credentials_id" integer)`);
+        await queryRunner.query(`CREATE INDEX "IDX_15af4b63be0b5c589c0badef20" ON "trading_bot" ("type") `);
+        await queryRunner.query(`CREATE INDEX "IDX_e15f04a148cd2c321831651e1a" ON "trading_bot" ("exchange") `);
+        await queryRunner.query(`CREATE INDEX "IDX_a02101e5415f97dabb9318d7ed" ON "trading_bot" ("user_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_df3dbc2491e68eb07e6e6dd88e" ON "trading_bot" ("credentials_id") `);
         await queryRunner.query(`CREATE TABLE "exchange_credentials" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "type" text NOT NULL DEFAULT ('Testnet'), "api_key" varchar NOT NULL, "api_secret" varchar NOT NULL, "exchange" text NOT NULL, "user_id" integer NOT NULL)`);
         await queryRunner.query(`CREATE INDEX "IDX_3a9c4805b0db929f4e7cbb8496" ON "exchange_credentials" ("type") `);
         await queryRunner.query(`CREATE INDEX "IDX_da368da5531e149a13562accf8" ON "exchange_credentials" ("exchange") `);
@@ -12,9 +17,21 @@ export class Init1730753049642 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_3352060c129507f0492f894ab6" ON "telegram-account" ("telegram_user_id") `);
         await queryRunner.query(`CREATE INDEX "IDX_e539d4f7c6cc02d9df5d777f59" ON "telegram-account" ("chat_id") `);
         await queryRunner.query(`CREATE INDEX "IDX_387600fa130874e6f1975b49a4" ON "telegram-account" ("user_id") `);
-        await queryRunner.query(`CREATE TABLE "trading_bot_config" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "take_profit" real, "grid_step" real, "grid_volume" real, "symbol" varchar, "user_id" integer NOT NULL, CONSTRAINT "REL_1ea32e1069f3231dc7e686714d" UNIQUE ("user_id"))`);
+        await queryRunner.query(`CREATE TABLE "trading_bot_config" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "base_currency" varchar NOT NULL, "quote_currency" varchar NOT NULL, "take_profit" real NOT NULL, "grid_step" real NOT NULL, "grid_volume" real NOT NULL, "user_id" integer NOT NULL)`);
         await queryRunner.query(`CREATE INDEX "IDX_1ea32e1069f3231dc7e686714d" ON "trading_bot_config" ("user_id") `);
         await queryRunner.query(`CREATE TABLE "user" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "username" varchar NOT NULL, "password" varchar NOT NULL, CONSTRAINT "UQ_78a916df40e02a9deb1c4b75edb" UNIQUE ("username"))`);
+        await queryRunner.query(`DROP INDEX "IDX_15af4b63be0b5c589c0badef20"`);
+        await queryRunner.query(`DROP INDEX "IDX_e15f04a148cd2c321831651e1a"`);
+        await queryRunner.query(`DROP INDEX "IDX_a02101e5415f97dabb9318d7ed"`);
+        await queryRunner.query(`DROP INDEX "IDX_df3dbc2491e68eb07e6e6dd88e"`);
+        await queryRunner.query(`CREATE TABLE "temporary_trading_bot" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "type" text NOT NULL, "exchange" text NOT NULL, "base_currency" varchar NOT NULL, "quote_currency" varchar NOT NULL, "take_profit" real NOT NULL, "grid_step" real NOT NULL, "grid_volume" real NOT NULL, "state" integer NOT NULL DEFAULT (1), "user_id" integer NOT NULL, "credentials_id" integer, CONSTRAINT "FK_a02101e5415f97dabb9318d7eda" FOREIGN KEY ("user_id") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE CASCADE, CONSTRAINT "FK_df3dbc2491e68eb07e6e6dd88e6" FOREIGN KEY ("credentials_id") REFERENCES "exchange_credentials" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_trading_bot"("id", "type", "exchange", "base_currency", "quote_currency", "take_profit", "grid_step", "grid_volume", "state", "user_id", "credentials_id") SELECT "id", "type", "exchange", "base_currency", "quote_currency", "take_profit", "grid_step", "grid_volume", "state", "user_id", "credentials_id" FROM "trading_bot"`);
+        await queryRunner.query(`DROP TABLE "trading_bot"`);
+        await queryRunner.query(`ALTER TABLE "temporary_trading_bot" RENAME TO "trading_bot"`);
+        await queryRunner.query(`CREATE INDEX "IDX_15af4b63be0b5c589c0badef20" ON "trading_bot" ("type") `);
+        await queryRunner.query(`CREATE INDEX "IDX_e15f04a148cd2c321831651e1a" ON "trading_bot" ("exchange") `);
+        await queryRunner.query(`CREATE INDEX "IDX_a02101e5415f97dabb9318d7ed" ON "trading_bot" ("user_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_df3dbc2491e68eb07e6e6dd88e" ON "trading_bot" ("credentials_id") `);
         await queryRunner.query(`DROP INDEX "IDX_3a9c4805b0db929f4e7cbb8496"`);
         await queryRunner.query(`DROP INDEX "IDX_da368da5531e149a13562accf8"`);
         await queryRunner.query(`DROP INDEX "IDX_0b7d13e380462e2bcabd746102"`);
@@ -36,8 +53,8 @@ export class Init1730753049642 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_e539d4f7c6cc02d9df5d777f59" ON "telegram-account" ("chat_id") `);
         await queryRunner.query(`CREATE INDEX "IDX_387600fa130874e6f1975b49a4" ON "telegram-account" ("user_id") `);
         await queryRunner.query(`DROP INDEX "IDX_1ea32e1069f3231dc7e686714d"`);
-        await queryRunner.query(`CREATE TABLE "temporary_trading_bot_config" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "take_profit" real, "grid_step" real, "grid_volume" real, "symbol" varchar, "user_id" integer NOT NULL, CONSTRAINT "REL_1ea32e1069f3231dc7e686714d" UNIQUE ("user_id"), CONSTRAINT "FK_1ea32e1069f3231dc7e686714d2" FOREIGN KEY ("user_id") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE CASCADE)`);
-        await queryRunner.query(`INSERT INTO "temporary_trading_bot_config"("id", "take_profit", "grid_step", "grid_volume", "symbol", "user_id") SELECT "id", "take_profit", "grid_step", "grid_volume", "symbol", "user_id" FROM "trading_bot_config"`);
+        await queryRunner.query(`CREATE TABLE "temporary_trading_bot_config" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "base_currency" varchar NOT NULL, "quote_currency" varchar NOT NULL, "take_profit" real NOT NULL, "grid_step" real NOT NULL, "grid_volume" real NOT NULL, "user_id" integer NOT NULL, CONSTRAINT "FK_1ea32e1069f3231dc7e686714d2" FOREIGN KEY ("user_id") REFERENCES "user" ("id") ON DELETE CASCADE ON UPDATE CASCADE)`);
+        await queryRunner.query(`INSERT INTO "temporary_trading_bot_config"("id", "base_currency", "quote_currency", "take_profit", "grid_step", "grid_volume", "user_id") SELECT "id", "base_currency", "quote_currency", "take_profit", "grid_step", "grid_volume", "user_id" FROM "trading_bot_config"`);
         await queryRunner.query(`DROP TABLE "trading_bot_config"`);
         await queryRunner.query(`ALTER TABLE "temporary_trading_bot_config" RENAME TO "trading_bot_config"`);
         await queryRunner.query(`CREATE INDEX "IDX_1ea32e1069f3231dc7e686714d" ON "trading_bot_config" ("user_id") `);
@@ -46,8 +63,8 @@ export class Init1730753049642 implements MigrationInterface {
     public async down(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`DROP INDEX "IDX_1ea32e1069f3231dc7e686714d"`);
         await queryRunner.query(`ALTER TABLE "trading_bot_config" RENAME TO "temporary_trading_bot_config"`);
-        await queryRunner.query(`CREATE TABLE "trading_bot_config" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "take_profit" real, "grid_step" real, "grid_volume" real, "symbol" varchar, "user_id" integer NOT NULL, CONSTRAINT "REL_1ea32e1069f3231dc7e686714d" UNIQUE ("user_id"))`);
-        await queryRunner.query(`INSERT INTO "trading_bot_config"("id", "take_profit", "grid_step", "grid_volume", "symbol", "user_id") SELECT "id", "take_profit", "grid_step", "grid_volume", "symbol", "user_id" FROM "temporary_trading_bot_config"`);
+        await queryRunner.query(`CREATE TABLE "trading_bot_config" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "base_currency" varchar NOT NULL, "quote_currency" varchar NOT NULL, "take_profit" real NOT NULL, "grid_step" real NOT NULL, "grid_volume" real NOT NULL, "user_id" integer NOT NULL)`);
+        await queryRunner.query(`INSERT INTO "trading_bot_config"("id", "base_currency", "quote_currency", "take_profit", "grid_step", "grid_volume", "user_id") SELECT "id", "base_currency", "quote_currency", "take_profit", "grid_step", "grid_volume", "user_id" FROM "temporary_trading_bot_config"`);
         await queryRunner.query(`DROP TABLE "temporary_trading_bot_config"`);
         await queryRunner.query(`CREATE INDEX "IDX_1ea32e1069f3231dc7e686714d" ON "trading_bot_config" ("user_id") `);
         await queryRunner.query(`DROP INDEX "IDX_387600fa130874e6f1975b49a4"`);
@@ -70,6 +87,18 @@ export class Init1730753049642 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_0b7d13e380462e2bcabd746102" ON "exchange_credentials" ("user_id") `);
         await queryRunner.query(`CREATE INDEX "IDX_da368da5531e149a13562accf8" ON "exchange_credentials" ("exchange") `);
         await queryRunner.query(`CREATE INDEX "IDX_3a9c4805b0db929f4e7cbb8496" ON "exchange_credentials" ("type") `);
+        await queryRunner.query(`DROP INDEX "IDX_df3dbc2491e68eb07e6e6dd88e"`);
+        await queryRunner.query(`DROP INDEX "IDX_a02101e5415f97dabb9318d7ed"`);
+        await queryRunner.query(`DROP INDEX "IDX_e15f04a148cd2c321831651e1a"`);
+        await queryRunner.query(`DROP INDEX "IDX_15af4b63be0b5c589c0badef20"`);
+        await queryRunner.query(`ALTER TABLE "trading_bot" RENAME TO "temporary_trading_bot"`);
+        await queryRunner.query(`CREATE TABLE "trading_bot" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "type" text NOT NULL, "exchange" text NOT NULL, "base_currency" varchar NOT NULL, "quote_currency" varchar NOT NULL, "take_profit" real NOT NULL, "grid_step" real NOT NULL, "grid_volume" real NOT NULL, "state" integer NOT NULL DEFAULT (1), "user_id" integer NOT NULL, "credentials_id" integer)`);
+        await queryRunner.query(`INSERT INTO "trading_bot"("id", "type", "exchange", "base_currency", "quote_currency", "take_profit", "grid_step", "grid_volume", "state", "user_id", "credentials_id") SELECT "id", "type", "exchange", "base_currency", "quote_currency", "take_profit", "grid_step", "grid_volume", "state", "user_id", "credentials_id" FROM "temporary_trading_bot"`);
+        await queryRunner.query(`DROP TABLE "temporary_trading_bot"`);
+        await queryRunner.query(`CREATE INDEX "IDX_df3dbc2491e68eb07e6e6dd88e" ON "trading_bot" ("credentials_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_a02101e5415f97dabb9318d7ed" ON "trading_bot" ("user_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_e15f04a148cd2c321831651e1a" ON "trading_bot" ("exchange") `);
+        await queryRunner.query(`CREATE INDEX "IDX_15af4b63be0b5c589c0badef20" ON "trading_bot" ("type") `);
         await queryRunner.query(`DROP TABLE "user"`);
         await queryRunner.query(`DROP INDEX "IDX_1ea32e1069f3231dc7e686714d"`);
         await queryRunner.query(`DROP TABLE "trading_bot_config"`);
@@ -81,6 +110,11 @@ export class Init1730753049642 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX "IDX_da368da5531e149a13562accf8"`);
         await queryRunner.query(`DROP INDEX "IDX_3a9c4805b0db929f4e7cbb8496"`);
         await queryRunner.query(`DROP TABLE "exchange_credentials"`);
+        await queryRunner.query(`DROP INDEX "IDX_df3dbc2491e68eb07e6e6dd88e"`);
+        await queryRunner.query(`DROP INDEX "IDX_a02101e5415f97dabb9318d7ed"`);
+        await queryRunner.query(`DROP INDEX "IDX_e15f04a148cd2c321831651e1a"`);
+        await queryRunner.query(`DROP INDEX "IDX_15af4b63be0b5c589c0badef20"`);
+        await queryRunner.query(`DROP TABLE "trading_bot"`);
     }
 
 }

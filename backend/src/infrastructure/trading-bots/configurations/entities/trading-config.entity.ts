@@ -3,8 +3,7 @@ import {
 	Column,
 	Entity,
 	Index,
-	JoinColumn,
-	OneToOne,
+	ManyToOne,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
 
@@ -13,26 +12,28 @@ export class TradingBotConfigEntity {
 	@PrimaryGeneratedColumn()
 	id: number;
 
-	@Column({ type: 'real', nullable: true })
+	@Column()
+	baseCurrency: string;
+
+	@Column()
+	quoteCurrency: string;
+
+	@Column({ type: 'real' })
 	takeProfit: number;
 
-	@Column({ type: 'real', nullable: true })
+	@Column({ type: 'real' })
 	gridStep: number;
 
-	@Column({ type: 'real', nullable: true })
+	@Column({ type: 'real' })
 	gridVolume: number;
-
-	@Column({ nullable: true })
-	symbol: string;
 
 	@Index()
 	@Column()
 	userId: number;
 
-	@OneToOne(() => UserEntity, (user) => user.botConfig, {
+	@ManyToOne(() => UserEntity, (user) => user.botConfigs, {
 		onDelete: 'CASCADE',
 		onUpdate: 'CASCADE',
 	})
-	@JoinColumn()
 	user: UserEntity;
 }

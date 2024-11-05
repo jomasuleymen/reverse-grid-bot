@@ -1,5 +1,6 @@
 import {
-	BotState,
+	CreateTradingBotOrder,
+	TradingBotOrder,
 	TradingBotSnapshot,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
@@ -12,7 +13,6 @@ import {
 	WalletBalanceV5,
 	WebsocketClient,
 } from 'bybit-api';
-import sleep from 'sleep-promise';
 import { BaseReverseGridBot } from '../common/base-reverse-grid-bot';
 
 /**
@@ -29,28 +29,6 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	private publicWsClient: WebsocketClient;
 
 	private readonly accountType: WalletBalanceV5['accountType'] = 'UNIFIED';
-
-	private readonly requestConfig = {
-		maxAttempts: 3,
-	};
-
-	private readonly gridConfig = {
-		atLeastBuyCount: 2,
-		maxCount: 27,
-	};
-
-	private readonly marketData = {
-		lastPrice: 0,
-	};
-
-	private readonly processStates = {
-		isCheckingLastPrice: false,
-	};
-
-	private readonly triggerPrices = {
-		maxPrice: 0,
-		minPrice: 100_000_000,
-	};
 
 	constructor(private readonly loggerService: LoggerService) {
 		super();
@@ -116,7 +94,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 
 		let allQuantity = 0;
 		for (const order of this.orders) {
-			if (order.type === 'buy') allQuantity += order.quantity;
+			if (order.side === 'buy') allQuantity += order.quantity;
 			else allQuantity -= order.quantity;
 		}
 
@@ -194,14 +172,13 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	}
 
 	private configureWsEmits() {
-		this.wsClient.on('update', (data) => {
+		this.wsClient.on('update', async (data) => {
 			if (!data) return;
-			
-			this.loggerService.info(data);
+
 			if (data.topic === 'order' && data.data) {
 				for (let order of data.data) {
 					if (order.orderStatus === 'Filled') {
-						this.handleFilledOrder(order);
+						await this.handleNewFilledOrder(order);
 					}
 				}
 			}
@@ -210,11 +187,8 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			if (!data) return;
 			if (data.topic === `tickers.${this.config.symbol}`) {
 				if (data.data) {
-					this.marketData.lastPrice = Number(data.data.lastPrice);
-
-					if (!this.processStates.isCheckingLastPrice) {
-						this.checkLastPrice(Number(data.data.lastPrice));
-					}
+					const lastPrice = Number(data.data.lastPrice);
+					this.updateLastPrice(lastPrice);
 				}
 			}
 		});
@@ -239,275 +213,79 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		});
 	}
 
-	private handleFilledOrder(order: any) {
-		if (this.state !== BotState.Running) return;
-
-		const triggerPrice = this.getPriceFromCustomOrderId(order.orderLinkId);
-		if (!triggerPrice) return;
-
-		const fee =
-			order.feeCurrency === 'USDT'
-				? Number(order.cumExecFee)
-				: Number(order.cumExecFee) * Number(order.avgPrice);
-
-		const orders: BatchOrderParamsV5[] = [];
-
-		if (order.side === 'Buy') {
-			this.addNewOrder({
-				price: Number(order.avgPrice),
-				quantity: Number(order.qty),
-				type: 'buy',
-				fee: fee,
-			});
-
-			orders.push(
-				this.getStopLossOptions(
-					triggerPrice - this.config.gridStep,
-					order.cumExecQty,
-				),
-			);
-
-			let maxTriggerPrice =
-				triggerPrice +
-				this.config.gridStep * this.gridConfig.atLeastBuyCount;
-
-			while (this.triggerPrices.maxPrice < maxTriggerPrice) {
-				const newTriggerPrice =
-					this.triggerPrices.maxPrice + this.config.gridStep;
-
-				orders.push(
-					this.getStopOrderOptions(
-						'Buy',
-						newTriggerPrice,
-						order.cumExecQty,
-					),
-				);
-
-				this.updateTriggerPrices(newTriggerPrice);
-			}
-		} else if (order.side === 'Sell') {
-			this.addNewOrder({
-				price: Number(order.avgPrice),
-				quantity: Number(order.qty),
-				type: 'sell',
-				fee: fee,
-			});
-			orders.push(
-				this.getStopOrderOptions(
-					'Buy',
-					triggerPrice + this.config.gridStep,
-					order.cumExecQty,
-				),
-			);
-			this.updateTriggerPrices(triggerPrice + this.config.gridStep);
-		}
-
-		this.submitBatchOrdersWithRetry(orders);
-		const sellCount = this.orders.filter((o) => o.type === 'sell').length;
-		const buyCount = this.orders.length - sellCount;
-		// if (buyCount - sellCount >= this.tradeConfig.cancelOnBuyCount) {
-		// 	this.stopProcess();
-		// } else if (orders.length) {
-		const pnl = this.calculatePnL(this.marketData.lastPrice);
-		const message = `BYBIT
-			📈 **Информация об ордере**
-			- Сторона: ${order.side}
-			- Триггерная цена: ${triggerPrice}
-			- Покупная цена: ${order.avgPrice}
-			💰 **Доходность**
-			- Реализованная прибыль: ${pnl.realizedPnL.toFixed(2)}
-			- Нереализованная прибыль: ${pnl.unrealizedPnL.toFixed(2)}
-			- Прибыль: ${(pnl.unrealizedPnL + pnl.realizedPnL).toFixed(2)}
-			📊 **Текущая торговая статистика**
-			- Текущая цена: ${this.marketData.lastPrice.toFixed(2)}
-			🔄 **Общее количество операций**
-			- Покупки: ${buyCount}
-			- Продажи: ${sellCount}`;
-
-		this.sendMessage(message);
-		// }
-	}
-
-	private getBaseOrderOptions(
-		side: 'Buy' | 'Sell',
-		qty: number,
+	protected getCreateOrderParams(
+		order: CreateTradingBotOrder,
 	): OrderParamsV5 {
-		return {
+		const params: OrderParamsV5 = {
 			category: 'spot',
-			side: side,
-			qty: qty.toString(),
-			symbol: this.config.symbol,
+			side: order.side === 'buy' ? 'Buy' : 'Sell',
+			qty: order.quantity.toFixed(6).toString(),
+			orderLinkId: order.customId,
+			symbol: order.symbol,
 			orderType: 'Market',
 			marketUnit: 'baseCoin',
 			timeInForce: 'GTC',
-			isLeverage: side === 'Buy' ? 1 : 0,
+			isLeverage: order.side === 'buy' ? 1 : 0,
 		};
+
+		if (order.type === 'order') {
+			params.orderFilter = 'Order';
+		} else if (order.type === 'stop-loss') {
+			params.orderFilter = 'tpslOrder';
+			params.slOrderType = 'Market';
+			params.triggerPrice = order.price.toString();
+		} else if (order.type === 'stop-order') {
+			params.orderFilter = 'StopOrder';
+			params.triggerPrice = order.price.toString();
+		}
+
+		console.log(order, params);
+
+		return params;
 	}
 
-	private getStopOrderOptions(
-		side: 'Buy' | 'Sell',
-		price: number,
-		qty: number,
-	): OrderParamsV5 {
+	protected parseIncomingOrder(order: any): TradingBotOrder {
 		return {
-			...this.getBaseOrderOptions(side, qty),
-			orderLinkId: this.getCustomOrderId(side, price),
-			orderFilter: 'StopOrder',
-			triggerPrice: price.toString(),
+			id: order.id,
+			avgPrice: Number(order.avgPrice),
+			customId: order.orderLinkId,
+			fee: Number(order.cumExecFee),
+			feeCurrency: order.feeCurrency,
+			quantity: Number(order.qty),
+			side: order.side === 'Buy' ? 'buy' : 'sell',
+			symbol: this.config.symbol,
 		};
 	}
 
-	private getStopLossOptions(price: number, qty: number): OrderParamsV5 {
-		return {
-			...this.getBaseOrderOptions('Sell', qty),
-			orderLinkId: this.getCustomOrderId('SL', price),
-			orderFilter: 'tpslOrder',
-			triggerPrice: price.toString(),
-			slOrderType: 'Market',
-		};
-	}
-	private updateTriggerPrices(price: number) {
-		this.triggerPrices.maxPrice = Math.max(
-			this.triggerPrices.maxPrice,
-			price,
-		);
-		this.triggerPrices.minPrice = Math.min(
-			this.triggerPrices.minPrice,
-			price,
-		);
-	}
-	private async submitOrderWithRetry(
-		orderParams: OrderParamsV5,
-		attempts = this.requestConfig.maxAttempts,
-	): Promise<void> {
-		this.loggerService.info('submitOrderWithRetry', orderParams);
-		while (attempts > 0) {
-			try {
-				const response = await this.restClient.submitOrder(orderParams);
-				if (response.retCode === 0) {
-					this.loggerService.info(
-						'Order placed successfully:',
-						response,
-					);
-					return;
-				} else {
-					throw new Error('Order failed, retrying...');
-				}
-			} catch (error) {
-				console.error(
-					`Error placing order, attempts left: ${attempts - 1}`,
-					error,
-				);
-				attempts -= 1;
-				if (attempts === 0) {
-					console.error(
-						'Max retry attempts reached. Order placement failed.',
-					);
-					return;
-				}
-
-				await sleep(800);
-			}
+	protected async submitOrderImpl(orderParams: OrderParamsV5): Promise<void> {
+		const response = await this.restClient.submitOrder(orderParams);
+		if (response.retCode === 0) {
+			this.loggerService.info('Order placed successfully:', response);
+			return;
+		} else {
+			throw new Error(response.retMsg);
 		}
 	}
-	private async submitBatchOrdersWithRetry(
+
+	protected async submitManyOrdersImpl(
 		ordersParams: BatchOrderParamsV5[],
-		attempts = this.requestConfig.maxAttempts,
 	): Promise<void> {
-		if (ordersParams.length === 0) return;
-
-		this.loggerService.info('submitOrderWithRetry', ordersParams);
-
-		while (attempts > 0) {
-			try {
-				const response = await this.restClient.batchSubmitOrders(
-					'spot' as any,
-					ordersParams,
-				);
-				// pinoLogger.info(response);
-				if (response.retCode === 0) {
-					// const notPlacedOrders = response.result.list.filter(
-					// 	(order) => !!order.orderId,
-					// );
-					this.loggerService.info('Orders placed successfully');
-					return;
-				} else {
-					throw new Error('Order failed, retrying...');
-				}
-			} catch (error) {
-				console.error(
-					`Error placing order, attempts left: ${attempts - 1}`,
-					error,
-				);
-				attempts -= 1;
-				if (attempts === 0) {
-					console.error(
-						'Max retry attempts reached. Order placement failed.',
-					);
-					return;
-				}
-
-				await sleep(800);
-			}
-		}
-	}
-	private async makeFirstOrders() {
-		if (
-			this.state !== BotState.Idle &&
-			this.state !== BotState.Initializing
-		)
-			return;
-
-		try {
-			const res = await this.restClient.getTickers({
-				category: 'spot',
-				symbol: this.config.symbol,
-			});
-			const startPrice = Number(res.result.list[0]?.lastPrice);
-			this.updateTriggerPrices(startPrice);
-			this.state = BotState.Running;
-			await this.submitOrderWithRetry({
-				...this.getBaseOrderOptions('Buy', this.config.gridVolume),
-				orderLinkId: `Buy_${startPrice}_${Date.now()}`,
-				orderFilter: 'Order',
-			});
-			``;
-		} catch (error) {
-			console.error('Error initializing orders:', error);
+		const response = await this.restClient.batchSubmitOrders(
+			'spot' as any,
+			ordersParams,
+		);
+		if (response.retCode === 0) {
+			this.loggerService.info('Orders placed successfully');
+		} else {
+			throw new Error(response.retMsg);
 		}
 	}
 
-	private async checkLastPrice(lastPrice: number) {
-		if (
-			this.processStates.isCheckingLastPrice ||
-			this.state !== BotState.Running
-		)
-			return;
-		this.processStates.isCheckingLastPrice = true;
-		const orders: BatchOrderParamsV5[] = [];
-
-		while (
-			this.triggerPrices.minPrice >=
-			lastPrice + this.config.gridStep * 2
-		) {
-			const newTriggerPrice =
-				this.triggerPrices.minPrice - this.config.gridStep;
-
-			orders.push(
-				this.getStopOrderOptions(
-					'Buy',
-					newTriggerPrice,
-					this.config.gridVolume,
-				),
-			);
-
-			this.updateTriggerPrices(newTriggerPrice);
-		}
-
-		if (orders.length) {
-			await this.submitBatchOrdersWithRetry(orders);
-		}
-
-		this.processStates.isCheckingLastPrice = false;
+	protected async getTickerPrice(ticker: string): Promise<number> {
+		const res = await this.restClient.getTickers({
+			category: 'spot',
+			symbol: this.config.symbol,
+		});
+		return Number(res.result.list[0]?.lastPrice);
 	}
 }

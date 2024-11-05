@@ -5,34 +5,44 @@ import CustomInputNumber from '@/components/CustomInputNumber'
 import UpsertModalForm from '@/components/UpsertModalForm'
 import { SERVICES } from '@/services'
 import { CreateTradingBotConfig } from '@/services/trading-bot.service'
-import { TRADING_BOT_QUERY_KEY } from '.'
+import { TRADING_BOT_CONFIGS_QUERY_KEY } from '.'
 
-export type TCreateTradingBotConfigForm = CreateTradingBotConfig
+export type TCreateTradingBotConfigForm = CreateTradingBotConfig | CreateTradingBotConfig
+type FormItemType = FormItemProps<TCreateTradingBotConfigForm>
 
-export const BotConfigFormItems: FormItemProps<TCreateTradingBotConfigForm>[] = [
+export const BotConfigFormItems: (FormItemType | FormItemType[])[] = [
+  [
+    {
+      label: 'Базовая валюта',
+      name: 'baseCurrency',
+      rules: [{ required: true }],
+      required: true,
+      children: <Input />,
+    },
+    {
+      label: 'Котируемая валюта',
+      name: 'quoteCurrency',
+      rules: [{ required: true }],
+      required: true,
+      children: <Input />,
+    },
+  ],
   {
-    label: 'Тикер',
-    name: 'symbol',
-    rules: [{ required: true }],
-    required: true,
-    children: <Input />,
-  },
-  {
-    label: 'Шаг сетки',
-    name: 'gridStep',
-    rules: [{ required: true }],
-    required: true,
-    children: <CustomInputNumber />,
-  },
-  {
-    label: 'Объем сетки',
+    label: 'Объем сетки (Базовая валюта)',
     name: 'gridVolume',
     rules: [{ required: true }],
     required: true,
     children: <CustomInputNumber />,
   },
   {
-    label: 'Тейк-профит',
+    label: 'Шаг сетки (Котируемая валюта)',
+    name: 'gridStep',
+    rules: [{ required: true }],
+    required: true,
+    children: <CustomInputNumber />,
+  },
+  {
+    label: 'Тейк-профит (Котируемая валюта)',
     name: 'takeProfit',
     rules: [{ required: true }],
     required: true,
@@ -55,7 +65,7 @@ const TopBar: React.FC<TopBarProps> = ({}) => {
           buttonText="Добавить настройку"
           title="Добавить настройку"
           onSubmit={onSubmit}
-          queryKey={TRADING_BOT_QUERY_KEY}
+          queryKey={TRADING_BOT_CONFIGS_QUERY_KEY}
           formItems={BotConfigFormItems}
           parseError={(error: { message: string }) => {
             return error.message

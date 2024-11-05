@@ -1,12 +1,24 @@
-import { IUser } from '../account/user.interface';
 import { ExchangeEnum } from '../exchanges/common.interface';
 import { WalletBalance } from './wallet.interface';
 
-export type TraidingBotOrder = {
+export type TradingBotOrder = {
+	id: string | number;
+	feeCurrency: string;
+	customId: string;
+	avgPrice: number;
+	quantity: number;
+	side: 'buy' | 'sell';
+	fee: number;
+	symbol: string;
+};
+
+export type CreateTradingBotOrder = {
+	customId: string;
 	price: number;
 	quantity: number;
-	type: 'buy' | 'sell';
-	fee: number;
+	type: 'order' | 'stop-loss' | 'stop-order';
+	side: 'buy' | 'sell';
+	symbol: string;
 };
 
 export type TradingBotSnapshot = {
@@ -21,10 +33,12 @@ export enum ExchangeCredentialsType {
 }
 
 export interface ITradingBotConfig {
+	baseCurrency: string;
+	quoteCurrency: string;
+	symbol: string;
 	takeProfit: number;
 	gridStep: number;
 	gridVolume: number;
-	symbol: string;
 }
 
 export interface IExchangeCredentials {
@@ -42,11 +56,14 @@ export enum BotState {
 	Stopped = 5,
 }
 
+export interface IStartReverseBotOptions {
+	userId: number;
+	config: ITradingBotConfig;
+	credentials: IExchangeCredentials;
+	onStateUpdate: (newStatus: BotState) => void;
+}
+
 export interface ITradingBot {
-	start(
-		config: ITradingBotConfig,
-		credentials: IExchangeCredentials,
-		user: IUser,
-	): Promise<void>;
+	start(options: IStartReverseBotOptions): Promise<void>;
 	stop(): Promise<void>;
 }

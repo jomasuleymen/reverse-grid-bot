@@ -9,6 +9,7 @@ import {
 	PrimaryGeneratedColumn,
 } from 'typeorm';
 import { TradingBotConfigEntity } from '../../trading-bots/configurations/entities/trading-config.entity';
+import { TradingBotEntity } from '@/infrastructure/trading-bots/entities/trading-bots.entity';
 
 @Entity('user')
 export class UserEntity {
@@ -22,10 +23,15 @@ export class UserEntity {
 	@Column()
 	password: string;
 
-	@OneToOne(() => TradingBotConfigEntity, (botConfig) => botConfig.user, {
+	@OneToMany(() => TradingBotConfigEntity, (tradingBot) => tradingBot.user, {
 		cascade: ['insert', 'update'],
 	})
-	botConfig: TradingBotConfigEntity;
+	tradingBots: TradingBotEntity[];
+
+	@OneToMany(() => TradingBotConfigEntity, (botConfig) => botConfig.user, {
+		cascade: ['insert', 'update'],
+	})
+	botConfigs: TradingBotConfigEntity[];
 
 	@OneToOne(
 		() => TelegramAccountEntity,

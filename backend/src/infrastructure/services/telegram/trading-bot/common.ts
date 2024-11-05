@@ -2,7 +2,7 @@ import { TradingBotConfigEntity } from '@/infrastructure/trading-bots/configurat
 
 type EditableFields = keyof Pick<
 	TradingBotConfigEntity,
-	'takeProfit' | 'gridStep' | 'gridVolume' | 'symbol'
+	'takeProfit' | 'gridStep' | 'gridVolume' | 'baseCurrency' | 'quoteCurrency'
 >;
 
 export const CALLBACK_ACTIONS = {
@@ -46,10 +46,18 @@ export const formFieldConfig: Record<
 		parse: (value) => Number(value),
 		humanReadable: (value) => Number(value).toString(),
 	},
-	symbol: {
-		label: 'Символ',
-		dbField: 'symbol',
-		inputPrompt: 'Введите символ',
+	baseCurrency: {
+		label: 'Базовая валюта',
+		dbField: 'baseCurrency',
+		inputPrompt: 'Базовая валюта',
+		validation: (value) => typeof value === 'string',
+		parse: (value) => value,
+		humanReadable: (value) => value,
+	},
+	quoteCurrency: {
+		label: 'Котируемая валюта',
+		dbField: 'quoteCurrency',
+		inputPrompt: 'Введите Котируемая валюта',
 		validation: (value) => typeof value === 'string',
 		parse: (value) => value,
 		humanReadable: (value) => value,

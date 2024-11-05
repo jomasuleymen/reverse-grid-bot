@@ -24,6 +24,7 @@ import { TradingBotUpdate } from './trading-bot/telegram-bot.update';
 				launchOptions: {
 					dropPendingUpdates: true,
 				},
+				options: { telegram: { apiMode: 'bot' } },
 			}),
 		}),
 	],

@@ -27,8 +27,6 @@ export class TelegramService {
 		} else {
 			this.logger.warn('Telegram bot has not allowed users');
 		}
-
-		this.handleErrors();
 	}
 
 	private getAllowedUserIds(): number[] {
@@ -38,14 +36,6 @@ export class TelegramService {
 		return Array.isArray(chatIds)
 			? chatIds.map(Number).filter(Number.isInteger)
 			: [];
-	}
-
-	private handleErrors(): void {
-		if (!this.bot) return;
-
-		this.bot.catch((err) => {
-			this.logger.error('Telegram bot error', err);
-		});
 	}
 
 	public addMyCommands(commands: BotCommand[]) {
@@ -59,7 +49,8 @@ export class TelegramService {
 	public async sendMessage(userId: number, message: string) {
 		if (!this.bot) return;
 
-		const account = await this.telegramPreferencesService.findByUserId(userId);
+		const account =
+			await this.telegramPreferencesService.findByUserId(userId);
 		if (!account) return;
 
 		try {

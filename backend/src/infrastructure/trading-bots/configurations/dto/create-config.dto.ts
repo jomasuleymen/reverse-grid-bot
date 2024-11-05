@@ -10,6 +10,9 @@ export class CreateBotConfigDto {
 	@IsNumber({}, { message: 'Объём сетки должен быть числом.' })
 	gridVolume: number;
 
-	@IsString({ message: 'Символ должен быть строкой.' })
-	symbol: string;
+	@IsString({ message: 'Базовая валюта должен быть строкой.' })
+	baseCurrency: string;
+
+	@IsString({ message: 'Котируемая валюта должен быть строкой.' })
+	quoteCurrency: string;
 }

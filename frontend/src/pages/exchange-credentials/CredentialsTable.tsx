@@ -1,5 +1,5 @@
+import ConfirmModal from '@/components/ConfirmModal'
 import DataTable from '@/components/DataTable'
-import DeleteItemModal from '@/components/DeleteItemModal'
 import { ColumnsType } from 'antd/es/table'
 import React, { memo } from 'react'
 
@@ -37,10 +37,14 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     key: 'action',
     render: (_, record: ColumnType) => (
       <Space>
-        <DeleteItemModal
+        <ConfirmModal
           modalTitle={`Удалить аккаунт ${record.exchange}(${record.type})?`}
-          onDelete={() => SERVICES.EXCHANGE.CREDENTIALS.deleteOne(record.id)}
+          onOk={() => SERVICES.EXCHANGE.CREDENTIALS.deleteOne(record.id)}
           invalidateQueryKey={queryKey}
+          actionText="Удалить"
+          cancelText="Отмена"
+          okText="Удалить"
+          okType="danger"
         />
       </Space>
     ),
