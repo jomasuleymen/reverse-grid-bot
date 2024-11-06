@@ -6,9 +6,21 @@ import dotenv from 'dotenv'
 import type { ConfigEnv, UserConfig } from 'vite'
 import { defineConfig } from 'vite'
 import checker from 'vite-plugin-checker'
+import viteCompression from 'vite-plugin-compression'
 
 const baseConfig: UserConfig = {
-  plugins: [React({ jsxImportSource: '@emotion/react' }), checker({ typescript: true })],
+  plugins: [
+    React({ jsxImportSource: '@emotion/react' }),
+    checker({ typescript: true }),
+    viteCompression({
+      algorithm: 'gzip',
+      deleteOriginFile: false,
+      compressionOptions: {
+        level: 5,
+      },
+      verbose: false,
+    }),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
