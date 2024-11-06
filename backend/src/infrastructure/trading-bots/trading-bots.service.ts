@@ -137,6 +137,9 @@ export class TradingBotService {
 	}
 
 	private async updateBotState(botId: number, state: BotState) {
+		if (state === BotState.Stopped && this.bots[botId])
+			delete this.bots[botId];
+
 		await this.tradingBotRepo.update(botId, {
 			state,
 			stoppedAt: state === BotState.Stopped ? new Date() : undefined,
