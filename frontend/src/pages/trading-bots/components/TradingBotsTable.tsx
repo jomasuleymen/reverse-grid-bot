@@ -107,7 +107,7 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     key: 'action',
     render: (_, record: ColumnType) => (
       <Space>
-        {record.state === TradingBotState.Running && (
+        {record.state !== TradingBotState.Stopped && record.state !== TradingBotState.Stopping && (
           <ConfirmModal
             modalTitle="Остановить бота?"
             onOk={() => SERVICES.TRADING_BOT.stopBot(record.id)}

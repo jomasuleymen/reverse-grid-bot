@@ -1,7 +1,7 @@
 import {
 	CreateTradingBotOrder,
+	ExchangeCredentialsType,
 	TradingBotOrder,
-	TradingBotSnapshot,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
@@ -18,7 +18,6 @@ import { BaseReverseGridBot } from '../common/base-reverse-grid-bot';
 /**
  * TODO
  * 1. check for grids count. max grid count must be 25. if reaches to 25, then sell first orders to make grid count to 25.
- * 2. trade only usdt: check in validation
  */
 
 @Injectable({ scope: Scope.TRANSIENT })
@@ -34,20 +33,14 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		super();
 	}
 
-	protected async isExistsSymbol(symbol: string): Promise<boolean> {
-		const coinPriceRes = await this.restClient.getTickers({
-			category: 'spot' as any,
-			symbol,
-		});
-
-		return !!coinPriceRes.result?.list?.length;
-	}
-
 	protected async postSetConfiguration(): Promise<void> {
+		const isTestnet =
+			this.credentials.type == ExchangeCredentialsType.Testnet;
+
 		this.restClient = new RestClientV5({
 			key: this.credentials.apiKey,
 			secret: this.credentials.apiSecret,
-			demoTrading: this.isTestnet,
+			demoTrading: isTestnet,
 			parseAPIRateLimits: true,
 			recv_window: 10_000,
 		});
@@ -56,7 +49,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			key: this.credentials.apiKey,
 			secret: this.credentials.apiSecret,
 			market: 'v5',
-			demoTrading: this.isTestnet,
+			demoTrading: isTestnet,
 		});
 
 		this.publicWsClient = new WebsocketClient({
@@ -74,7 +67,60 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		);
 	}
 
-	protected async cleanUp() {
+	private configureWsEmits() {
+		this.publicWsClient.on('update', (data) => {
+			if (!data) return;
+			if (data.topic === `tickers.${this.config.symbol}`) {
+				if (data.data) {
+					const lastPrice = Number(data.data.lastPrice);
+					this.updateLastPrice(lastPrice);
+				}
+			}
+		});
+
+		this.wsClient.on('update', async (data) => {
+			if (!data) return;
+
+			if (data.topic === 'order' && data.data) {
+				for (let order of data.data) {
+					if (order.orderStatus === 'Filled') {
+						await this.handleNewFilledOrder(order);
+					}
+				}
+			}
+		});
+
+		this.wsClient.on('open', () => {
+			this.loggerService.info('WS OPENED');
+		});
+
+		this.wsClient.on('response', (data) => {
+			if (!data) return;
+
+			if (data.success && data.req_id === 'order') {
+				this.makeFirstOrder();
+			}
+		});
+
+		this.wsClient.on('reconnect', (data) => {
+			this.loggerService.info('ws reconnecting.... ');
+		});
+
+		this.wsClient.on('reconnected', (data) => {
+			this.loggerService.info('ws reconnected ');
+		});
+	}
+
+	protected async isExistsSymbol(symbol: string): Promise<boolean> {
+		const coinPriceRes = await this.restClient.getTickers({
+			category: 'spot' as any,
+			symbol,
+		});
+
+		return !!coinPriceRes.result?.list?.length;
+	}
+
+	protected async cancelAllOrders(): Promise<void> {
 		await this.restClient
 			.cancelAllOrders({
 				category: 'spot',
@@ -91,30 +137,9 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			.then((res) => {
 				this.loggerService.info('stop.tpslOrder', res);
 			});
+	}
 
-		let allQuantity = 0;
-		for (const order of this.orders) {
-			if (order.side === 'buy') allQuantity += order.quantity;
-			else allQuantity -= order.quantity;
-		}
-
-		if (allQuantity > 0) {
-			await this.restClient
-				.submitOrder({
-					category: 'spot',
-					symbol: this.config.symbol,
-					side: 'Sell',
-					orderType: 'Market',
-					qty: allQuantity.toFixed(6).toString(),
-					marketUnit: 'baseCoin',
-					timeInForce: 'IOC',
-					orderFilter: 'Order',
-				})
-				.then((res) => {
-					this.loggerService.info('stop.sellAllQuantity', res);
-				});
-		}
-
+	protected async cleanUp() {
 		this.wsClient.closeAll(true);
 		this.publicWsClient.closeAll(true);
 
@@ -127,22 +152,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		this.publicWsClient = null;
 	}
 
-	protected async createSnapshot(): Promise<TradingBotSnapshot> {
-		// get current price of symbol
-		const coinPriceRes = await this.restClient.getTickers({
-			category: 'spot' as any,
-			symbol: this.config.symbol,
-		});
-
-		const foundTicker = coinPriceRes.result.list.find(
-			(value) => value.symbol === this.config.symbol,
-		);
-
-		if (!foundTicker) {
-			throw new Error(`Тикер ${this.config.symbol} не найден`);
-		}
-
-		// Get wallet balance
+	protected async getWalletBalance(): Promise<WalletBalance> {
 		const walletBalanceRes = await this.restClient.getWalletBalance({
 			accountType: this.accountType,
 		});
@@ -164,53 +174,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			})),
 		};
 
-		return {
-			currentPrice: Number(foundTicker.lastPrice),
-			datetime: new Date(),
-			walletBalance,
-		};
-	}
-
-	private configureWsEmits() {
-		this.wsClient.on('update', async (data) => {
-			if (!data) return;
-
-			if (data.topic === 'order' && data.data) {
-				for (let order of data.data) {
-					if (order.orderStatus === 'Filled') {
-						await this.handleNewFilledOrder(order);
-					}
-				}
-			}
-		});
-		this.publicWsClient.on('update', (data) => {
-			if (!data) return;
-			if (data.topic === `tickers.${this.config.symbol}`) {
-				if (data.data) {
-					const lastPrice = Number(data.data.lastPrice);
-					this.updateLastPrice(lastPrice);
-				}
-			}
-		});
-		this.wsClient.on('open', () => {
-			this.loggerService.info('WS OPENED');
-		});
-
-		this.wsClient.on('response', (data) => {
-			if (!data) return;
-
-			if (data.success && data.req_id === 'order') {
-				this.makeFirstOrders();
-			}
-		});
-
-		this.wsClient.on('reconnect', (data) => {
-			this.loggerService.info('ws reconnecting.... ');
-		});
-
-		this.wsClient.on('reconnected', (data) => {
-			this.loggerService.info('ws reconnected ');
-		});
+		return walletBalance;
 	}
 
 	protected getCreateOrderParams(
@@ -233,13 +197,11 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		} else if (order.type === 'stop-loss') {
 			params.orderFilter = 'tpslOrder';
 			params.slOrderType = 'Market';
-			params.triggerPrice = order.price.toString();
+			params.triggerPrice = order.triggerPrice.toString();
 		} else if (order.type === 'stop-order') {
 			params.orderFilter = 'StopOrder';
-			params.triggerPrice = order.price.toString();
+			params.triggerPrice = order.triggerPrice.toString();
 		}
-
-		console.log(order, params);
 
 		return params;
 	}
@@ -281,11 +243,19 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		}
 	}
 
-	protected async getTickerPrice(ticker: string): Promise<number> {
-		const res = await this.restClient.getTickers({
-			category: 'spot',
-			symbol: this.config.symbol,
+	protected async getTickerLastPrice(ticker: string): Promise<number> {
+		const coinPriceRes = await this.restClient.getTickers({
+			category: 'spot' as any,
+			symbol: ticker,
 		});
-		return Number(res.result.list[0]?.lastPrice);
+
+		const foundTicker = coinPriceRes.result.list.find(
+			(value) => value.symbol === ticker,
+		);
+
+		if (!foundTicker) {
+			throw new Error(`Тикер ${ticker} не найден`);
+		}
+		return Number(foundTicker.lastPrice);
 	}
 }

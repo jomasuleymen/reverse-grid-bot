@@ -1,7 +1,6 @@
 import {
 	BotState,
 	CreateTradingBotOrder,
-	ExchangeCredentialsType,
 	IExchangeCredentials,
 	IStartReverseBotOptions,
 	ITradingBot,
@@ -9,19 +8,35 @@ import {
 	TradingBotOrder,
 	TradingBotSnapshot,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
-import TelegramService from '@/infrastructure/services/telegram/telegram.service';
-import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common';
+import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
+import { BadRequestException, Injectable, Scope } from '@nestjs/common';
 import sleep from 'sleep-promise';
+import { BaseTradingBot } from './base-trading-bot';
+
+enum OrderCustomIdPrefix {
+	FIRST_BUY = 'FIRST_BUY',
+	BUY_TRIGGER = 'BUY_TG',
+	STOP_LOSS = 'SL',
+	SELL_ALL = 'SELL_ALL',
+}
 
 @Injectable({ scope: Scope.TRANSIENT })
-export abstract class BaseReverseGridBot implements ITradingBot {
-	protected readonly orders: TradingBotOrder[] = [];
+export abstract class BaseReverseGridBot
+	extends BaseTradingBot
+	implements ITradingBot
+{
 	protected config: ITradingBotConfig;
-	protected state: BotState = BotState.Idle;
 	protected credentials: IExchangeCredentials;
-	protected userId: number;
-	protected isTestnet: boolean;
+
+	private state: BotState = BotState.Idle;
+	private readonly orders: TradingBotOrder[] = [];
+	private readonly snapshots: {
+		start?: TradingBotSnapshot;
+		end?: TradingBotSnapshot;
+	} = {};
 	private onStateUpdate: (newStatus: BotState) => void;
+
+	private readonly minBaseWalletUsdValue = 10;
 	private readonly requestConfig = {
 		maxAttempts: 3,
 	};
@@ -38,113 +53,189 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		minPrice: 100_000_000,
 	};
 
-	protected isCheckingLastPrice: boolean = false;
+	// Processes state
+	private isCheckingLastPrice: boolean = false;
+	private isMadeFirstOrder: boolean = false;
 
-	@Inject(TelegramService)
-	private readonly telegramService: TelegramService;
+	public async start(options: IStartReverseBotOptions): Promise<void> {
+		this.userId = options.userId;
+		this.config = options.config;
+		this.credentials = options.credentials;
 
-	protected readonly snapshots: {
-		start?: TradingBotSnapshot;
-		end?: TradingBotSnapshot;
-	} = {};
+		this.onStateUpdate = options.onStateUpdate;
 
-	protected async sendMessage(message: string) {
-		this.telegramService.sendMessage(this.userId, message);
+		await this.postSetConfiguration();
+
+		const isSymbolExists = await this.isExistsSymbol(this.config.symbol);
+		if (!isSymbolExists) {
+			throw new BadRequestException(
+				`Тикер ${this.config.symbol} не найден.`,
+			);
+		}
+
+		this.updateState(BotState.Initializing);
+
+		const snapshot = await this.createSnapshot();
+
+		const coinBalance = snapshot.walletBalance.coins.find(
+			(coin) => coin.coin === this.config.baseCurrency,
+		);
+
+		if (!coinBalance)
+			throw new BadRequestException(
+				`${this.config.baseCurrency} кошелека не найден`,
+			);
+
+		if (coinBalance.usdValue < this.minBaseWalletUsdValue)
+			throw new BadRequestException(
+				`В кошелке ${this.config.baseCurrency} меньше ${this.minBaseWalletUsdValue} USD`,
+			);
+
+		this.snapshots.start = snapshot;
+
+		await this.sendMessage(this.getSnapshotMessage(this.snapshots.start));
+
+		await this.init();
 	}
 
-	protected getCustomOrderId(prefix: string, price: number): string {
-		return `${prefix}_${price}_${Date.now()}`;
-	}
+	public async stop(): Promise<void> {
+		this.updateState(BotState.Stopping);
 
-	protected getPriceFromCustomOrderId(orderId: string): number | null {
-		if (!orderId) return null;
+		this.snapshots.end = await this.createSnapshot();
 
-		const [side, triggerPriceStr] = orderId.split('_');
-		if (!triggerPriceStr) return null;
+		this.state = BotState.Stopped;
+		await this.sendMessage(
+			`------ Открытие ------\n\n` +
+				this.getSnapshotMessage(this.snapshots.start!) +
+				'\n\n' +
+				`------ Закрытие ------\n\n` +
+				this.getSnapshotMessage(this.snapshots.end!),
+		);
 
-		return Number(triggerPriceStr) || null;
+		await this.cancelAllOrders();
+		await this.sellAllBoughtCurrencies();
+		await this.cleanUp();
+
+		this.updateState(BotState.Stopped);
 	}
 
 	protected updateState(newState: BotState) {
 		this.state = newState;
-		if (this.onStateUpdate) {
-			this.onStateUpdate(newState);
-		}
+		this.onStateUpdate?.(newState);
+	}
+
+	protected getCustomOrderId(
+		prefix: OrderCustomIdPrefix,
+		price: number,
+	): string {
+		return `${prefix}_${price}_${Date.now()}`;
+	}
+
+	protected parseCustomOrderId(
+		orderId: string,
+	): { prefix: OrderCustomIdPrefix; price: number } | null {
+		if (!orderId) return null;
+
+		const [prefix, triggerPriceStr] = orderId.split('_');
+		if (!prefix || !triggerPriceStr) return null;
+
+		const triggerPrice = Number(triggerPriceStr);
+		if (!triggerPrice) return null;
+
+		return {
+			prefix: prefix as OrderCustomIdPrefix,
+			price: triggerPrice,
+		};
 	}
 
 	protected async handleNewFilledOrder(rawOrder: any) {
 		if (this.state !== BotState.Running) return;
 		const order = this.parseIncomingOrder(rawOrder);
 
-		const triggerPrice = this.getPriceFromCustomOrderId(order.customId);
-		if (!triggerPrice) return;
+		const parsedCustomOrderId = this.parseCustomOrderId(order.customId);
+		if (!parsedCustomOrderId) return;
+
+		const { prefix, price: triggerPrice } = parsedCustomOrderId;
 
 		order.fee =
-			order.feeCurrency === this.config.quoteCurrency
+			order.feeCurrency.toUpperCase() ===
+			this.config.quoteCurrency.toUpperCase()
 				? Number(order.fee)
 				: Number(order.fee) * Number(order.avgPrice);
 
-		const orders: CreateTradingBotOrder[] = [];
+		if (
+			prefix === OrderCustomIdPrefix.BUY_TRIGGER ||
+			prefix === OrderCustomIdPrefix.STOP_LOSS ||
+			prefix === OrderCustomIdPrefix.FIRST_BUY
+		) {
+			const newOrders: CreateTradingBotOrder[] = [];
 
-		this.addNewOrder(order);
+			if (order.side === 'buy') {
+				newOrders.push({
+					type: 'stop-loss',
+					triggerPrice: triggerPrice - this.config.gridStep,
+					quantity: order.quantity,
+					customId: this.getCustomOrderId(
+						OrderCustomIdPrefix.STOP_LOSS,
+						triggerPrice - this.config.gridStep,
+					),
+					side: 'sell',
+					symbol: this.config.symbol,
+				});
 
-		if (order.side === 'buy') {
-			orders.push({
-				type: 'stop-loss',
-				price: triggerPrice - this.config.gridStep,
-				quantity: order.quantity,
-				customId: this.getCustomOrderId(
-					'SL',
-					triggerPrice - this.config.gridStep,
-				),
-				side: 'sell',
-				symbol: this.config.symbol,
-			});
+				let maxTriggerPrice =
+					triggerPrice +
+					this.config.gridStep * this.gridConfig.atLeastBuyCount;
 
-			let maxTriggerPrice =
-				triggerPrice +
-				this.config.gridStep * this.gridConfig.atLeastBuyCount;
+				while (this.triggerPrices.maxPrice < maxTriggerPrice) {
+					const newTriggerPrice =
+						this.triggerPrices.maxPrice + this.config.gridStep;
 
-			while (this.triggerPrices.maxPrice < maxTriggerPrice) {
-				const newTriggerPrice =
-					this.triggerPrices.maxPrice + this.config.gridStep;
+					newOrders.push({
+						type: 'stop-order',
+						side: 'buy',
+						triggerPrice: newTriggerPrice,
+						quantity: order.quantity,
+						customId: this.getCustomOrderId(
+							OrderCustomIdPrefix.BUY_TRIGGER,
+							newTriggerPrice,
+						),
+						symbol: this.config.symbol,
+					});
 
-				orders.push({
+					this.updateTriggerPrices(newTriggerPrice);
+				}
+			} else {
+				const newTriggerPrice = triggerPrice + this.config.gridStep;
+
+				newOrders.push({
 					type: 'stop-order',
 					side: 'buy',
-					price: newTriggerPrice,
+					triggerPrice: newTriggerPrice,
 					quantity: order.quantity,
-					customId: this.getCustomOrderId('SO-buy', newTriggerPrice),
+					customId: this.getCustomOrderId(
+						OrderCustomIdPrefix.BUY_TRIGGER,
+						newTriggerPrice,
+					),
 					symbol: this.config.symbol,
 				});
 
 				this.updateTriggerPrices(newTriggerPrice);
 			}
-		} else {
-			const newTriggerPrice = triggerPrice + this.config.gridStep;
 
-			orders.push({
-				type: 'stop-order',
-				side: 'buy',
-				price: newTriggerPrice,
-				quantity: order.quantity,
-				customId: this.getCustomOrderId('SO-buy', newTriggerPrice),
-				symbol: this.config.symbol,
-			});
-
-			this.updateTriggerPrices(newTriggerPrice);
+			this.submitManyOrders(newOrders);
 		}
 
-		this.submitManyOrders(orders);
+		this.addNewOrder(order);
 		this.sendNewOrderSummary(order, triggerPrice);
 	}
 
 	protected updateLastPrice(lastPrice: number) {
 		this.marketData.lastPrice = lastPrice;
-		this.checkPriceLowering(lastPrice);
+		this.checkAndCreateBuyOrders(lastPrice);
 	}
 
-	private async checkPriceLowering(lastPrice: number) {
+	private async checkAndCreateBuyOrders(lastPrice: number) {
 		if (this.isCheckingLastPrice || this.state !== BotState.Running) return;
 		this.isCheckingLastPrice = true;
 
@@ -159,9 +250,12 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 			orders.push({
 				side: 'buy',
-				price: newTriggerPrice,
+				triggerPrice: newTriggerPrice,
 				type: 'stop-order',
-				customId: this.getCustomOrderId('SO-buy', newTriggerPrice),
+				customId: this.getCustomOrderId(
+					OrderCustomIdPrefix.BUY_TRIGGER,
+					newTriggerPrice,
+				),
 				quantity: this.config.gridVolume,
 				symbol: this.config.symbol,
 			});
@@ -215,56 +309,25 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		);
 	}
 
-	public async start(options: IStartReverseBotOptions): Promise<void> {
-		this.userId = options.userId;
-		this.config = options.config;
-		this.credentials = options.credentials;
-		this.isTestnet =
-			this.credentials.type == ExchangeCredentialsType.Testnet;
-
-		this.onStateUpdate = options.onStateUpdate;
-
-		await this.postSetConfiguration();
-
-		// TODO: validate balance
-
-		const isSymbolExists = await this.isExistsSymbol(this.config.symbol);
-		if (!isSymbolExists) {
-			throw new BadRequestException(
-				`Тикер ${this.config.symbol} не найден.`,
-			);
+	private async sellAllBoughtCurrencies() {
+		let allQuantity = 0;
+		for (const order of this.orders) {
+			if (order.side === 'buy') allQuantity += order.quantity;
+			else allQuantity -= order.quantity;
 		}
 
-		this.updateState(BotState.Initializing);
-
-		// validate configs
-		// TODO: do something
-
-		this.snapshots.start = await this.createSnapshot();
-
-		await this.sendMessage(this.getSnapshotMessage(this.snapshots.start));
-
-		await this.init();
-	}
-
-	public async stop(): Promise<void> {
-		// TODO: do something
-		this.updateState(BotState.Stopping);
-
-		this.snapshots.end = await this.createSnapshot();
-
-		this.state = BotState.Stopped;
-		await this.sendMessage(
-			`------ Открытие ------\n\n` +
-				this.getSnapshotMessage(this.snapshots.start!) +
-				'\n\n' +
-				`------ Закрытие ------\n\n` +
-				this.getSnapshotMessage(this.snapshots.end!),
-		);
-
-		await this.cleanUp();
-
-		this.updateState(BotState.Stopped);
+		if (allQuantity > 0) {
+			await this.submitOrder({
+				customId: this.getCustomOrderId(
+					OrderCustomIdPrefix.SELL_ALL,
+					0,
+				),
+				quantity: allQuantity,
+				side: 'sell',
+				symbol: this.config.symbol,
+				type: 'order',
+			});
+		}
 	}
 
 	protected addNewOrder(order: TradingBotOrder) {
@@ -304,6 +367,8 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	private getSnapshotMessage(snapshot: TradingBotSnapshot): string {
+		if (!snapshot?.walletBalance) return 'Нету данные';
+
 		const coin = snapshot.walletBalance.coins
 			.map(
 				(c) =>
@@ -324,25 +389,30 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		);
 	}
 
-	protected async makeFirstOrders() {
+	protected async makeFirstOrder() {
+		if (this.isMadeFirstOrder) return;
+		this.isMadeFirstOrder = true;
+
 		if (
 			this.state !== BotState.Idle &&
 			this.state !== BotState.Initializing
 		)
 			return;
 
-		console.log('makeFirstOrders');
-
 		try {
-			const startPrice = await this.getTickerPrice(this.config.symbol);
+			const startPrice = await this.getTickerLastPrice(
+				this.config.symbol,
+			);
 			this.updateTriggerPrices(startPrice);
 			this.updateState(BotState.Running);
 
 			await this.submitOrder({
 				side: 'buy',
-				customId: this.getCustomOrderId('Order-buy', startPrice),
+				customId: this.getCustomOrderId(
+					OrderCustomIdPrefix.FIRST_BUY,
+					startPrice,
+				),
 				type: 'order',
-				price: startPrice,
 				quantity: this.config.gridVolume,
 				symbol: this.config.symbol,
 			});
@@ -350,75 +420,71 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			console.log('ERROR while makeFirstOrders', err);
 		}
 	}
-
-	private async submitManyOrders(
-		orders: CreateTradingBotOrder[],
+	private async retrySubmitOrders(
+		submitOrderCallback: () => Promise<void>,
 		attempts = this.requestConfig.maxAttempts,
 	) {
+		while (attempts > 0) {
+			try {
+				await submitOrderCallback();
+				return;
+			} catch (error) {
+				console.error(
+					`Error placing order, attempts left: ${attempts - 1}`,
+					error,
+				);
+				attempts -= 1;
+				if (attempts === 0) {
+					console.error(
+						'Max retry attempts reached. Order placement failed.',
+					);
+					return;
+				}
+				await sleep(1000); // delay before retry
+			}
+		}
+	}
+
+	private async submitManyOrders(orders: CreateTradingBotOrder[]) {
 		if (orders.length === 0) return;
 
 		const rawOrders = orders.map(this.getCreateOrderParams);
 
-		// this.loggerService.info('submitOrderWithRetry', ordersParams);
-
-		while (attempts > 0) {
-			try {
-				await this.submitManyOrdersImpl(rawOrders);
-			} catch (error) {
-				console.error(
-					`Error placing order, attempts left: ${attempts - 1}`,
-					error,
-				);
-				attempts -= 1;
-				if (attempts === 0) {
-					console.error(
-						'Max retry attempts reached. Order placement failed.',
-					);
-					return;
-				}
-
-				await sleep(800);
-			}
-		}
+		await this.retrySubmitOrders(() =>
+			this.submitManyOrdersImpl(rawOrders),
+		);
 	}
 
-	private async submitOrder(
-		order: CreateTradingBotOrder,
-		attempts = this.requestConfig.maxAttempts,
-	) {
+	private async submitOrder(order: CreateTradingBotOrder) {
 		const rawOrder = this.getCreateOrderParams(order);
 
-		// this.loggerService.info('submitOrderWithRetry', ordersParams);
-
-		while (attempts > 0) {
-			try {
-				await this.submitOrderImpl(rawOrder);
-			} catch (error) {
-				console.error(
-					`Error placing order, attempts left: ${attempts - 1}`,
-					error,
-				);
-				attempts -= 1;
-				if (attempts === 0) {
-					console.error(
-						'Max retry attempts reached. Order placement failed.',
-					);
-					return;
-				}
-
-				await sleep(800);
-			}
-		}
+		await this.retrySubmitOrders(() => this.submitOrderImpl(rawOrder));
 	}
+
+	protected async createSnapshot(): Promise<TradingBotSnapshot> {
+		const currentPrice = await this.getTickerLastPrice(this.config.symbol);
+		const walletBalance = await this.getWalletBalance();
+
+		return {
+			currentPrice: currentPrice,
+			datetime: new Date(),
+			walletBalance,
+		};
+	}
+
+	// init should call makeFirstOrder
+	protected abstract init(): Promise<void>;
+	protected abstract postSetConfiguration(): Promise<void>;
+	protected abstract cancelAllOrders(): Promise<void>;
+	protected abstract cleanUp(): Promise<void>;
+
+	protected abstract isExistsSymbol(symbol: string): Promise<boolean>;
+	protected abstract getTickerLastPrice(ticker: string): Promise<number>;
+	protected abstract getWalletBalance(): Promise<WalletBalance>;
 
 	protected abstract submitOrderImpl(orderParams: any): Promise<void>;
 	protected abstract submitManyOrdersImpl(ordersParams: any[]): Promise<void>;
-	protected abstract getTickerPrice(ticker: string): Promise<number>;
+
 	protected abstract getCreateOrderParams(order: CreateTradingBotOrder): any;
 	protected abstract parseIncomingOrder(order: any): TradingBotOrder;
-	protected abstract isExistsSymbol(symbol: string): Promise<boolean>;
-	protected abstract postSetConfiguration(): Promise<void>;
-	protected abstract init(): Promise<void>;
-	protected abstract cleanUp(): Promise<void>;
-	protected abstract createSnapshot(): Promise<TradingBotSnapshot>;
 }

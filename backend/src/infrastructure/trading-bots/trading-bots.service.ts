@@ -1,6 +1,7 @@
 import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
 import {
 	BotState,
+	IExchangeCredentials,
 	ITradingBot,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
@@ -27,19 +28,44 @@ export class TradingBotService {
 	) {}
 
 	async startBot(userId: number, options: StartBotDto): Promise<void> {
-		const credentials = await this.exchangeCredentialsService.findById(
+		const credentials = await this.getCredentials(
+			userId,
 			options.credentialsId,
 		);
+		const botEntity = await this.createBotEntity(
+			userId,
+			credentials,
+			options,
+		);
+		const bot = await this.getBotInstance(botEntity.exchange);
 
-		if (credentials?.userId !== userId) {
+		await this.startBotInstance(bot, botEntity, credentials, options);
+	}
+
+	async stopBot(userId: number, botId: number): Promise<void> {
+		const bot = this.bots[botId];
+		if (!bot) return;
+
+		await this.stopBotInstance(bot, botId);
+	}
+
+	// Helper Methods
+	private async getCredentials(userId: number, credentialsId: number) {
+		const credentials =
+			await this.exchangeCredentialsService.findById(credentialsId);
+
+		if (!credentials || credentials.userId !== userId) {
 			throw new BadRequestException('Реквизиты бирж не ваша');
 		}
+		return credentials;
+	}
 
-		if (!credentials) {
-			throw new BadRequestException('Реквизиты для входа не найдены');
-		}
-
-		const botEntity = await this.tradingBotRepo.save({
+	private async createBotEntity(
+		userId: number,
+		credentials: IExchangeCredentials,
+		options: StartBotDto,
+	) {
+		return this.tradingBotRepo.save({
 			userId,
 			credentialsId: credentials.id,
 			exchange: credentials.exchange,
@@ -49,78 +75,81 @@ export class TradingBotService {
 			takeProfit: options.takeProfit,
 			baseCurrency: options.baseCurrency,
 			quoteCurrency: options.quoteCurrency,
+			symbol: `${options.baseCurrency}${options.quoteCurrency}`,
 		});
+	}
 
-		const bot = await this.getBot(botEntity.exchange);
+	private async getBotInstance(exchange: ExchangeEnum): Promise<ITradingBot> {
+		switch (exchange) {
+			case ExchangeEnum.Bybit:
+				return await this.moduleRef.resolve(BybitSpotReverseGridBot);
+			default:
+				throw new Error('Биржа не поддерживается');
+		}
+	}
 
+	private async startBotInstance(
+		bot: ITradingBot,
+		botEntity: TradingBotEntity,
+		credentials: IExchangeCredentials,
+		options: StartBotDto,
+	) {
 		try {
 			await bot.start({
 				config: {
 					...options,
-					symbol: options.baseCurrency + options.quoteCurrency,
+					symbol: `${options.baseCurrency}${options.quoteCurrency}`,
 				},
 				credentials,
-				userId,
-				onStateUpdate: async (state: BotState) => {
-					await this.updateBot(botEntity.id, { state });
-				},
+				userId: botEntity.userId,
+				onStateUpdate: async (state: BotState) =>
+					await this.updateBotState(botEntity.id, state),
 			});
 			this.bots[botEntity.id] = bot;
 		} catch (err) {
+			this.handleError('Ошибка при запуске бота:', err, botEntity.id);
 			await bot.stop();
-			await this.updateBot(botEntity.id, { stoppedAt: new Date() });
-			this.loggerService.error('Ошибка при запуске бота:', err);
-			throw new BadRequestException('Ошибка при запуске бота');
 		}
 	}
 
-	async stopBot(userId: number, botId: number): Promise<void> {
-		const bot = this.bots[botId];
-		if (!bot) {
-			throw new BadRequestException(
-				'Не найден активный бот для остановки.',
-			);
-		}
-
+	private async stopBotInstance(bot: ITradingBot, botId: number) {
 		try {
 			await bot.stop();
-			await this.updateBot(botId, { stoppedAt: new Date() });
-			delete this.bots[botId];
-			await this.tradingBotRepo.update(botId, {
-				state: BotState.Stopped,
-			});
 		} catch (err) {
 			this.loggerService.error('Ошибка при остановке бота:', err);
 			throw new BadRequestException('Ошибка при остановке бота');
+			
+		} finally {
+			delete this.bots[botId];
+			await this.updateBotState(botId, BotState.Stopped);
 		}
 	}
 
-	private async getBot(exchange: ExchangeEnum) {
-		switch (exchange) {
-			case ExchangeEnum.Bybit:
-				return await this.moduleRef.resolve(BybitSpotReverseGridBot);
-		}
-
-		throw new Error('Биржа не поддерживается');
+	private async updateBotState(botId: number, state: BotState) {
+		await this.tradingBotRepo.update(botId, {
+			state,
+			stoppedAt: state === BotState.Stopped ? new Date() : undefined,
+		});
 	}
 
+	private handleError(message: string, error: any, botId?: number) {
+		this.loggerService.error(message, error);
+		if (botId) this.updateBotState(botId, BotState.Stopped);
+		throw new BadRequestException(error.message || message);
+	}
+
+	// Other Methods
 	public async findBotsByUserId(userId: number, payload?: GetTradingBotsDto) {
 		const where: FindOptionsWhere<TradingBotEntity> = {
 			userId: Equal(userId),
+			state:
+				payload?.isActive === undefined
+					? undefined
+					: payload.isActive
+						? Not(Equal(BotState.Stopped))
+						: Equal(BotState.Stopped),
 		};
 
-		if (payload) {
-			if (payload.isActive === true) {
-				where.state = Not(Equal(BotState.Stopped));
-			} else if (payload.isActive === false) {
-				where.state = Equal(BotState.Stopped);
-			}
-		}
-
-		return await this.tradingBotRepo.find({ where, order: { id: 'DESC' } });
-	}
-
-	public async updateBot(botId: number, payload: Partial<TradingBotEntity>) {
-		return await this.tradingBotRepo.update(botId, payload);
+		return this.tradingBotRepo.find({ where, order: { id: 'DESC' } });
 	}
 }

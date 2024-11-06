@@ -14,12 +14,18 @@ export type TradingBotOrder = {
 
 export type CreateTradingBotOrder = {
 	customId: string;
-	price: number;
 	quantity: number;
-	type: 'order' | 'stop-loss' | 'stop-order';
 	side: 'buy' | 'sell';
 	symbol: string;
-};
+} & (
+	| {
+			type: 'order';
+	  }
+	| {
+			triggerPrice: number;
+			type: 'stop-loss' | 'stop-order';
+	  }
+);
 
 export type TradingBotSnapshot = {
 	currentPrice: number;
@@ -42,6 +48,7 @@ export interface ITradingBotConfig {
 }
 
 export interface IExchangeCredentials {
+	id: number;
 	type: ExchangeCredentialsType;
 	apiKey: string;
 	apiSecret: string;

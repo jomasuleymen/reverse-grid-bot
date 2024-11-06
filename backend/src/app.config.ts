@@ -2,6 +2,7 @@ import { ClassSerializerInterceptor, INestApplication, ValidationPipe } from "@n
 import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import { ValidationException } from "./common/exceptions/validation.exceptions";
+import { AllExceptionFilter } from "./common/filter/exception.filter";
 
 export const configApp = async (app: INestApplication<any>) => {
 	const configService = app.get<ConfigService>(ConfigService);
@@ -17,6 +18,7 @@ export const configApp = async (app: INestApplication<any>) => {
 	);
 
 	app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+	app.useGlobalFilters(new AllExceptionFilter());
 
 
 	const origins = configService.get("origins", "*");

@@ -25,7 +25,6 @@ const getFormItem = (item: FormItemProps) => {
 
 const StartBotModal: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [errors, setErrors] = useState<string[] | null>(null)
   const [form] = Form.useForm()
 
   const queryClient = useQueryClient()
@@ -44,15 +43,17 @@ const StartBotModal: React.FC = () => {
   const credentials = isSuccess ? data[0] : []
   const configs = isSuccess ? data[1] : []
 
-  // Mutation for starting the bot
-  const { mutate: startBot, isPending: isSubmitting } = useMutation({
+  const {
+    mutate: startBot,
+    isPending: isSubmitting,
+    error,
+    isError,
+    reset,
+  } = useMutation({
     mutationFn: (formData: IStartBotOptions) => SERVICES.TRADING_BOT.startBot(formData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trading-bots'] })
       setIsModalOpen(false)
-    },
-    onError: (error) => {
-      setErrors(['Failed to start bot. Please try again.'])
     },
   })
 
@@ -75,12 +76,11 @@ const StartBotModal: React.FC = () => {
 
   const handleOpenModal = () => {
     setIsModalOpen(true)
-    setErrors(null)
   }
 
   const handleCancel = () => {
     setIsModalOpen(false)
-    setErrors(null)
+    reset()
     form.resetFields()
   }
 
@@ -92,7 +92,7 @@ const StartBotModal: React.FC = () => {
       <br />
       <b>Шаг сетки:</b> {config.gridStep + ' ' + config.quoteCurrency}
       <br />
-      <b>Тейк-профит:</b> {config.takeProfit+ ' ' + config.quoteCurrency}
+      <b>Тейк-профит:</b> {config.takeProfit + ' ' + config.quoteCurrency}
     </>
   )
 
@@ -108,6 +108,7 @@ const StartBotModal: React.FC = () => {
         title="Запустить бота"
         open={isModalOpen}
         onCancel={handleCancel}
+        onClose={handleCancel}
         footer={null}
         centered
       >
@@ -147,13 +148,11 @@ const StartBotModal: React.FC = () => {
             ),
           )}
 
-          {errors && (
+          {isError && (
             <Alert
               message={
                 <ul>
-                  {errors.map((error, idx) => (
-                    <li key={idx}>{error}</li>
-                  ))}
+                  <li>{error.message}</li>
                 </ul>
               }
               type="error"

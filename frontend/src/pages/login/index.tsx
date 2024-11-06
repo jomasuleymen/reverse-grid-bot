@@ -66,13 +66,8 @@ const Login: React.FC<LoginProps> = () => {
             />
           </Form.Item>
 
-          {/* Display success or error message */}
-          {(isSuccess || isError) && (
-            <Alert
-              message={isSuccess ? data?.message : error?.message}
-              type={isSuccess && data?.success ? 'success' : 'error'}
-              style={{ fontSize: '12px' }}
-            />
+          {!isPending && isError && (
+            <Alert message={error?.message} type={'error'} style={{ fontSize: '12px' }} />
           )}
 
           <Form.Item className="m-0">
