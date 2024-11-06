@@ -6,6 +6,6 @@ import { BybitModule } from './modules/bybit/bybit.module';
 @Module({
 	imports: [ExchangeCredentialsModule, BinanceModule, BybitModule],
 	providers: [],
-	exports: [ExchangeCredentialsModule],
+	exports: [ExchangeCredentialsModule, BinanceModule, BybitModule],
 })
 export class ExchangesModule {}

@@ -1,8 +1,8 @@
 import { IsNumber, IsString } from 'class-validator';
 
 export class CreateBotConfigDto {
-	@IsNumber({}, { message: 'Тейк профит должен быть числом.' })
-	takeProfit: number;
+	@IsNumber({}, { message: 'Тейк профит число сетки должен быть числом.' })
+	takeProfitOnGrid: number;
 
 	@IsNumber({}, { message: 'Шаг сетки должен быть числом.' })
 	gridStep: number;

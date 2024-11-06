@@ -22,7 +22,7 @@ export class StartBotDto {
 	quoteCurrency: string;
 
 	@IsNumber()
-	takeProfit: number;
+	takeProfitOnGrid: number;
 
 	@IsNumber()
 	gridStep: number;

@@ -2,9 +2,11 @@ import ConfirmModal from '@/components/ConfirmModal'
 import DataTable from '@/components/DataTable'
 import { SERVICES } from '@/services'
 import { ITradingBotFilter, TradingBot, TradingBotState } from '@/services/trading-bot.service'
+import { formatDate } from '@/utils'
 import { Space } from 'antd'
 import { ColumnsType } from 'antd/es/table'
 import React from 'react'
+import { Link } from 'react-router-dom'
 
 type ColumnType = TradingBot & {
   key: number
@@ -43,14 +45,16 @@ const parseDataSource = (data: TradingBot[]): ColumnType[] => {
 
 const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
   {
-    title: 'Биржа',
+    title: 'Аккаунт',
     dataIndex: 'exchange',
     align: 'center',
-  },
-  {
-    title: 'Тип аккаунта',
-    dataIndex: 'type',
-    align: 'center',
+    render(value, record, index) {
+      return (
+        <span>
+          {value} ({record.type})
+        </span>
+      )
+    },
   },
   {
     title: 'Символ',
@@ -70,8 +74,8 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     align: 'center',
   },
   {
-    title: 'Тейк-профит',
-    dataIndex: 'takeProfit',
+    title: 'Тейк-профит на сетке',
+    dataIndex: 'takeProfitOnGrid',
     align: 'center',
   },
   {
@@ -80,7 +84,7 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     align: 'center',
     render(value, record) {
       if (!value) return
-      return <span>{new Date(value).toLocaleString('ru-Ru')}</span>
+      return <span>{formatDate(value, { showTime: true })}</span>
     },
   },
   {
@@ -89,7 +93,7 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     align: 'center',
     render(value, record) {
       if (!value) return
-      return <span>{new Date(value).toLocaleString('ru-Ru')}</span>
+      return <span>{formatDate(value, { showTime: true })}</span>
     },
   },
   {
@@ -118,6 +122,9 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
             okType="danger"
           />
         )}
+        <Link className="" to={`${record.id}/orders`}>
+          Детали
+        </Link>
       </Space>
     ),
     align: 'center',

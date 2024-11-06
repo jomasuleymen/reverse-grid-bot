@@ -2,7 +2,11 @@ import { TradingBotConfigEntity } from '@/infrastructure/trading-bots/configurat
 
 type EditableFields = keyof Pick<
 	TradingBotConfigEntity,
-	'takeProfit' | 'gridStep' | 'gridVolume' | 'baseCurrency' | 'quoteCurrency'
+	| 'takeProfitOnGrid'
+	| 'gridStep'
+	| 'gridVolume'
+	| 'baseCurrency'
+	| 'quoteCurrency'
 >;
 
 export const CALLBACK_ACTIONS = {
@@ -22,9 +26,9 @@ export const formFieldConfig: Record<
 		options?: string[];
 	}
 > = {
-	takeProfit: {
+	takeProfitOnGrid: {
 		label: 'Тейк профит',
-		dbField: 'takeProfit',
+		dbField: 'takeProfitOnGrid',
 		inputPrompt: 'Введите значение для тейк профита',
 		validation: (value) => !isNaN(Number(value)),
 		parse: (value) => Number(value),

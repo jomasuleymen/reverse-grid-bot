@@ -1,4 +1,4 @@
-import { Layout, Menu, MenuProps } from 'antd'
+import { Button, Layout, Menu, MenuProps } from 'antd'
 import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -28,33 +28,27 @@ export const Nav: React.FC = () => {
     return items
   }, [])
 
-  const rightNavbarItems = useMemo(() => {
-    const items: MenuItem[] = [
-      {
-        key: 'logout',
-        label: 'Выход',
-        onClick: () => {
-          logout()
-        },
-      },
-    ]
-
-    return items
-  }, [])
-
   const selectedKeys = useMemo(() => [normalizePath(pathname)], [pathname])
 
   return (
-    <Header className="flex px-0">
+    <Header className="flex px-0 items-center">
       <Menu
-        className="flex-1"
+        style={{ flex: 1, minWidth: 0 }}
         theme="dark"
         mode="horizontal"
         items={leftNavbarItems}
         selectedKeys={selectedKeys}
       />
 
-      <Menu theme="dark" mode="horizontal" items={rightNavbarItems} selectedKeys={selectedKeys} />
+      <Button
+        className="mr-3"
+        type="primary"
+        onClick={() => {
+          logout()
+        }}
+      >
+        Выход
+      </Button>
     </Header>
   )
 }

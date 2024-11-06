@@ -1,4 +1,7 @@
-import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
+import {
+	ExchangeEnum,
+	OrderSide,
+} from '@/domain/interfaces/exchanges/common.interface';
 import {
 	BotState,
 	IExchangeCredentials,
@@ -10,10 +13,13 @@ import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Equal, FindOptionsWhere, Not, Repository } from 'typeorm';
 import { ExchangeCredentialsService } from '../exchanges/exchange-credentials/exchange-credentials.service';
+import { BybitService } from '../exchanges/modules/bybit/bybit.service';
+import { calculateOrdersPnL } from '../utils/trading-orders.util';
 import { BybitSpotReverseGridBot } from './bots/bybit/spot-reverse-grid-bot';
 import { GetTradingBotsDto } from './dto/get-bots.dto';
 import { StartBotDto } from './dto/start-bot.dto';
 import { TradingBotEntity } from './entities/trading-bots.entity';
+import { TradingBotOrdersService } from './trading-bot-orders.service';
 
 @Injectable()
 export class TradingBotService {
@@ -23,7 +29,9 @@ export class TradingBotService {
 		@InjectRepository(TradingBotEntity)
 		private readonly tradingBotRepo: Repository<TradingBotEntity>,
 		private readonly exchangeCredentialsService: ExchangeCredentialsService,
+		private readonly tradingBotOrdersService: TradingBotOrdersService,
 		private readonly loggerService: LoggerService,
+		private readonly bybitService: BybitService,
 		private moduleRef: ModuleRef,
 	) {}
 
@@ -44,7 +52,10 @@ export class TradingBotService {
 
 	async stopBot(userId: number, botId: number): Promise<void> {
 		const bot = this.bots[botId];
-		if (!bot) return;
+		if (!bot) {
+			await this.updateBotState(botId, BotState.Stopped);
+			return;
+		}
 
 		await this.stopBotInstance(bot, botId);
 	}
@@ -72,7 +83,7 @@ export class TradingBotService {
 			type: credentials.type,
 			gridStep: options.gridStep,
 			gridVolume: options.gridVolume,
-			takeProfit: options.takeProfit,
+			takeProfitOnGrid: options.takeProfitOnGrid,
 			baseCurrency: options.baseCurrency,
 			quoteCurrency: options.quoteCurrency,
 			symbol: `${options.baseCurrency}${options.quoteCurrency}`,
@@ -102,6 +113,7 @@ export class TradingBotService {
 				},
 				credentials,
 				userId: botEntity.userId,
+				botId: botEntity.id,
 				onStateUpdate: async (state: BotState) =>
 					await this.updateBotState(botEntity.id, state),
 			});
@@ -118,7 +130,6 @@ export class TradingBotService {
 		} catch (err) {
 			this.loggerService.error('Ошибка при остановке бота:', err);
 			throw new BadRequestException('Ошибка при остановке бота');
-			
 		} finally {
 			delete this.bots[botId];
 			await this.updateBotState(botId, BotState.Stopped);
@@ -138,7 +149,6 @@ export class TradingBotService {
 		throw new BadRequestException(error.message || message);
 	}
 
-	// Other Methods
 	public async findBotsByUserId(userId: number, payload?: GetTradingBotsDto) {
 		const where: FindOptionsWhere<TradingBotEntity> = {
 			userId: Equal(userId),
@@ -151,5 +161,43 @@ export class TradingBotService {
 		};
 
 		return this.tradingBotRepo.find({ where, order: { id: 'DESC' } });
+	}
+
+	public async findBotById(id: number) {
+		const where: FindOptionsWhere<TradingBotEntity> = {
+			id: Equal(id),
+		};
+
+		return this.tradingBotRepo.findOne({ where });
+	}
+
+	public async getBotSummary(botId: number) {
+		const bot = await this.tradingBotRepo.findOne({
+			where: { id: Equal(botId) },
+		});
+
+		if (!bot) throw new BadRequestException('Бот не найден');
+
+		// const [orders, latestPrice] = await Promise.all([
+		// 	await this.tradingBotOrdersService.findByBotId(botId),
+		// 	await this.bybitService.getTickerLastPrice(
+		// 		'spot',
+		// 		bot.baseCurrency + bot.quoteCurrency,
+		// 	),
+		// ]);
+
+		const orders = await this.tradingBotOrdersService.findByBotId(botId);
+
+		const pnl = calculateOrdersPnL(orders);
+		const buyCount = orders.filter(
+			(order) => order.side === OrderSide.BUY,
+		).length;
+
+		return {
+			pnl,
+			buyCount,
+			sellCount: orders.length - buyCount,
+			sumComission: orders.reduce((prev, curr) => prev + curr.fee, 0),
+		};
 	}
 }

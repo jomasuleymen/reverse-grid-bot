@@ -13,7 +13,7 @@ import {
 import { CreateBotConfigDto } from './dto/create-config.dto';
 import { TradingBotConfigsService } from './trading-configs.service';
 
-@Controller('trading-bots/configs')
+@Controller('trading-bots-configs')
 @UseAuthorized()
 export class TradingBotConfigsController {
 	constructor(private readonly botConfigsSerice: TradingBotConfigsService) {}

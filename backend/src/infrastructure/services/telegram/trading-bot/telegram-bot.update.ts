@@ -3,57 +3,32 @@ import { TelegramPreferencesService } from '@/infrastructure/notification/telegr
 import TelegramService from '@/infrastructure/services/telegram/telegram.service';
 import { TradingBotConfigsService } from '@/infrastructure/trading-bots/configurations/trading-configs.service';
 import { TradingBotService } from '@/infrastructure/trading-bots/trading-bots.service';
-import {
-	Action,
-	Command,
-	Ctx,
-	Next,
-	Start,
-	Update,
-	Use,
-} from 'nestjs-telegraf';
+import { UserService } from '@/infrastructure/user/user.service';
+import { Action, Command, Ctx, On, Start, Update } from 'nestjs-telegraf';
 import LoggerService from '../../logger/logger.service';
 import { CALLBACK_ACTIONS, TradingUpdateBase } from './common';
 
 const BOT_COMMANDS = {
 	START: 'start',
 	STOP: 'stop',
-	EDIT_CONFIG: 'editconfig',
+	CONNECT: 'connect',
 };
 @Update()
 export class TradingBotUpdate extends TradingUpdateBase {
 	constructor(
 		private readonly botConfigService: TradingBotConfigsService,
 		private readonly telegramService: TelegramService,
+		private readonly userService: UserService,
 		private readonly telegramPreferencesService: TelegramPreferencesService,
 		private readonly tradingBotService: TradingBotService,
 		private readonly loggerService: LoggerService,
 	) {
 		super();
 		this.telegramService.addMyCommands([
-			{ command: BOT_COMMANDS.START, description: 'Старт бота' },
-			{ command: BOT_COMMANDS.STOP, description: 'Остановить бота' },
+			// { command: BOT_COMMANDS.START, description: 'Старт бота' },
+			// { command: BOT_COMMANDS.STOP, description: 'Остановить бота' },
+			{ command: BOT_COMMANDS.CONNECT, description: 'Связать с аккаунт' },
 		]);
-	}
-
-	@Use()
-	async validateUser(@Ctx() ctx: MyContext, @Next() next: any) {
-		if (ctx.from?.is_bot) return;
-
-		const userId = ctx.from?.id;
-
-		let account =
-			await this.telegramPreferencesService.findByTelegramUserId(userId!);
-		if (!account) {
-			this.loggerService.warn('Telegram bot access denied', {
-				from: ctx.from,
-				chat: ctx.chat,
-			});
-			await ctx.reply(`У вас нету доступа. Свяжитесь с разработчиком.`);
-			return;
-		}
-
-		return await next();
 	}
 
 	@Start()
@@ -88,6 +63,16 @@ export class TradingBotUpdate extends TradingUpdateBase {
 		// 			}
 		// 		: undefined,
 		// });
+	}
+
+	@Command(BOT_COMMANDS.CONNECT)
+	async connectCommand(@Ctx() ctx: MyContext) {
+		// @ts-ignore
+		ctx.session ??= {};
+		// @ts-ignore
+		ctx.session.waitingForConnectAnswer = true;
+
+		await ctx.reply('Введите username');
 	}
 
 	@Command(BOT_COMMANDS.STOP)
@@ -133,5 +118,32 @@ export class TradingBotUpdate extends TradingUpdateBase {
 		// } else {
 		// 	await ctx.reply('Операция отменена');
 		// }
+	}
+
+	@On('text')
+	async onText(@Ctx() ctx: MyContext) {
+		// @ts-ignore
+		if (ctx.session?.waitingForConnectAnswer) {
+			const username = ctx.text;
+
+			const user = await this.userService.findByUsername(username!);
+
+			if (!user) {
+				ctx.reply('Пользователь не найден!');
+			} else {
+				await this.telegramPreferencesService.save({
+					chatId: ctx.chat?.id,
+					firstName: ctx.from?.first_name,
+					telegramUserId: ctx.from?.id,
+					username: ctx.from?.username,
+					userId: user.id,
+				});
+
+				ctx.reply('Успешно!');
+			}
+
+			// @ts-ignore
+			ctx.session.waitingForConnectAnswer = false;
+		}
 	}
 }

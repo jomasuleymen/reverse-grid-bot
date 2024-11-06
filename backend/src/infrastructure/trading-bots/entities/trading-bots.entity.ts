@@ -11,8 +11,10 @@ import {
 	Entity,
 	Index,
 	ManyToOne,
+	OneToMany,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
+import { TradingBotOrdersEntity } from './trading-bot-orders.entity';
 
 @Entity('trading_bot')
 export class TradingBotEntity {
@@ -36,7 +38,7 @@ export class TradingBotEntity {
 	quoteCurrency: string;
 
 	@Column({ type: 'real' })
-	takeProfit: number;
+	takeProfitOnGrid: number;
 
 	@Column({ type: 'real' })
 	gridStep: number;
@@ -60,6 +62,11 @@ export class TradingBotEntity {
 
 	@Column({ nullable: true })
 	stoppedAt: Date;
+
+	@OneToMany(() => TradingBotOrdersEntity, (orders) => orders.bot, {
+		cascade: ['insert', 'update'],
+	})
+	orders: TradingBotOrdersEntity[];
 
 	@ManyToOne(() => UserEntity, (user) => user.tradingBots, {
 		onDelete: 'CASCADE',

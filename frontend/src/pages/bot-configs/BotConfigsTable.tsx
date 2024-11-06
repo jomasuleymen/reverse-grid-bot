@@ -45,8 +45,8 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     align: 'center',
   },
   {
-    title: 'Тейк-профит',
-    dataIndex: 'takeProfit',
+    title: 'Тейк-профит на сетке',
+    dataIndex: 'takeProfitOnGrid',
     align: 'center',
   },
   {

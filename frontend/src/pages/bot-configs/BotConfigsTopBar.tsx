@@ -42,8 +42,8 @@ export const BotConfigFormItems: (FormItemType | FormItemType[])[] = [
     children: <CustomInputNumber />,
   },
   {
-    label: 'Тейк-профит (Котируемая валюта)',
-    name: 'takeProfit',
+    label: 'Тейк-профит на сетке',
+    name: 'takeProfitOnGrid',
     rules: [{ required: true }],
     required: true,
     children: <CustomInputNumber />,

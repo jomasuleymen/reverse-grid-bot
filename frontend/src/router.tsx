@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react'
-import { RouterProvider, createBrowserRouter } from 'react-router-dom'
+import { RouteObject, RouterProvider, createBrowserRouter } from 'react-router-dom'
 
 import { ErrorPage } from '@/pages/ErrorPage'
 import Loading from './components/Loading'
@@ -10,13 +10,15 @@ const MainLayout = React.lazy(() => import('@/layout'))
 const TradingBotConfigs = React.lazy(() => import('@/pages/bot-configs'))
 const TradingBotAccounts = React.lazy(() => import('@/pages/exchange-credentials'))
 const TradingBots = React.lazy(() => import('@/pages/trading-bots'))
+const TradingBotOrders = React.lazy(() => import('@/pages/trading-bot-orders'))
 const LoginPage = React.lazy(() => import('@/pages/login'))
 
 type Route = {
   label?: string
   path: string
   protected?: boolean
-  element: React.LazyExoticComponent<React.FC>
+  element?: React.LazyExoticComponent<React.FC>
+  children?: Route[] // Support for nested routes (unlimited depth)
 }
 
 export const routes: Route[] = [
@@ -35,10 +37,37 @@ export const routes: Route[] = [
   {
     label: 'Боты',
     path: '/bots',
-    protected: true,
-    element: TradingBots,
+    children: [
+      {
+        path: '',
+        protected: true,
+        element: TradingBots,
+      },
+      {
+        path: ':botId/orders',
+        protected: true,
+        element: TradingBotOrders,
+      },
+    ],
   },
 ]
+
+const renderRoutes = (routes: Route[]): RouteObject[] =>
+  routes.map((route) => ({
+    path: route.path,
+    element: route.element && (
+      <Suspense fallback={<ScreenLoading />}>
+        {route.protected ? (
+          <ProtectedRoute>
+            <route.element />
+          </ProtectedRoute>
+        ) : (
+          <route.element />
+        )}
+      </Suspense>
+    ),
+    children: route.children ? renderRoutes(route.children) : [],
+  }))
 
 const router = createBrowserRouter([
   {
@@ -49,20 +78,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <MainLayout />,
     errorElement: <ErrorPage />,
-    children: routes.map((route) => ({
-      path: route.path,
-      element: (
-        <Suspense fallback={<ScreenLoading />}>
-          {route.protected ? (
-            <ProtectedRoute>
-              <route.element />
-            </ProtectedRoute>
-          ) : (
-            <route.element />
-          )}
-        </Suspense>
-      ),
-    })),
+    children: renderRoutes(routes),
   },
 ])
 

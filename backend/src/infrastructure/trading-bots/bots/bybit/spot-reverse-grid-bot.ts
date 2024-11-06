@@ -1,9 +1,11 @@
+import { OrderSide } from '@/domain/interfaces/exchanges/common.interface';
 import {
 	CreateTradingBotOrder,
 	ExchangeCredentialsType,
 	TradingBotOrder,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
+import { BybitService } from '@/infrastructure/exchanges/modules/bybit/bybit.service';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { Injectable, Scope } from '@nestjs/common';
 import {
@@ -29,7 +31,10 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 
 	private readonly accountType: WalletBalanceV5['accountType'] = 'UNIFIED';
 
-	constructor(private readonly loggerService: LoggerService) {
+	constructor(
+		private readonly loggerService: LoggerService,
+		private readonly bybitService: BybitService,
+	) {
 		super();
 	}
 
@@ -140,16 +145,18 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	}
 
 	protected async cleanUp() {
-		this.wsClient.closeAll(true);
-		this.publicWsClient.closeAll(true);
-
-		this.wsClient.removeAllListeners();
-		this.publicWsClient.removeAllListeners();
-
-		// @ts-ignore
-		this.wsClient = null;
-		// @ts-ignore
-		this.publicWsClient = null;
+		if (this.wsClient) {
+			this.wsClient.closeAll(true);
+			this.wsClient.removeAllListeners();
+			// @ts-ignore
+			this.wsClient = null;
+		}
+		if (this.publicWsClient) {
+			this.publicWsClient.closeAll(true);
+			this.publicWsClient.removeAllListeners();
+			// @ts-ignore
+			this.publicWsClient = null;
+		}
 	}
 
 	protected async getWalletBalance(): Promise<WalletBalance> {
@@ -182,14 +189,14 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	): OrderParamsV5 {
 		const params: OrderParamsV5 = {
 			category: 'spot',
-			side: order.side === 'buy' ? 'Buy' : 'Sell',
+			side: order.side === OrderSide.BUY ? 'Buy' : 'Sell',
 			qty: order.quantity.toFixed(6).toString(),
 			orderLinkId: order.customId,
 			symbol: order.symbol,
 			orderType: 'Market',
 			marketUnit: 'baseCoin',
 			timeInForce: 'GTC',
-			isLeverage: order.side === 'buy' ? 1 : 0,
+			isLeverage: order.side === OrderSide.BUY ? 1 : 0,
 		};
 
 		if (order.type === 'order') {
@@ -208,14 +215,15 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 
 	protected parseIncomingOrder(order: any): TradingBotOrder {
 		return {
-			id: order.id,
+			id: order.orderId,
 			avgPrice: Number(order.avgPrice),
 			customId: order.orderLinkId,
 			fee: Number(order.cumExecFee),
 			feeCurrency: order.feeCurrency,
 			quantity: Number(order.qty),
-			side: order.side === 'Buy' ? 'buy' : 'sell',
+			side: order.side === 'Buy' ? OrderSide.BUY : OrderSide.SELL,
 			symbol: this.config.symbol,
+			createdDate: new Date(Number(order.updatedTime) || 0),
 		};
 	}
 
@@ -244,18 +252,6 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	}
 
 	protected async getTickerLastPrice(ticker: string): Promise<number> {
-		const coinPriceRes = await this.restClient.getTickers({
-			category: 'spot' as any,
-			symbol: ticker,
-		});
-
-		const foundTicker = coinPriceRes.result.list.find(
-			(value) => value.symbol === ticker,
-		);
-
-		if (!foundTicker) {
-			throw new Error(`Тикер ${ticker} не найден`);
-		}
-		return Number(foundTicker.lastPrice);
+		return this.bybitService.getTickerLastPrice('spot', ticker);
 	}
 }

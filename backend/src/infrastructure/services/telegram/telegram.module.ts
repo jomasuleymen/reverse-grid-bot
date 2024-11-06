@@ -1,6 +1,7 @@
 import { MyContext } from '@/domain/adapters/telegram.interface';
 import { NotificationModule } from '@/infrastructure/notification/notification.module';
 import { TradingBotModule } from '@/infrastructure/trading-bots/trading-bots.module';
+import { UserModule } from '@/infrastructure/user/user.module';
 import {
 	forwardRef,
 	Module,
@@ -9,12 +10,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectBot, TelegrafModule } from 'nestjs-telegraf';
-import { Telegraf } from 'telegraf';
+import { session, Telegraf } from 'telegraf';
 import { TelegramService } from './telegram.service';
 import { TradingBotUpdate } from './trading-bot/telegram-bot.update';
 
 @Module({
 	imports: [
+		UserModule,
 		forwardRef(() => TradingBotModule),
 		NotificationModule,
 		TelegrafModule.forRootAsync({
@@ -24,6 +26,7 @@ import { TradingBotUpdate } from './trading-bot/telegram-bot.update';
 				launchOptions: {
 					dropPendingUpdates: true,
 				},
+				middlewares: [session()],
 				options: { telegram: { apiMode: 'bot' } },
 			}),
 		}),

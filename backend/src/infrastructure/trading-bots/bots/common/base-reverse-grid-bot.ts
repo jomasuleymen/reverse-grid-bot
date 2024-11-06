@@ -1,3 +1,4 @@
+import { OrderSide } from '@/domain/interfaces/exchanges/common.interface';
 import {
 	BotState,
 	CreateTradingBotOrder,
@@ -5,20 +6,16 @@ import {
 	IStartReverseBotOptions,
 	ITradingBot,
 	ITradingBotConfig,
+	OrderCreationType,
 	TradingBotOrder,
 	TradingBotSnapshot,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
-import { BadRequestException, Injectable, Scope } from '@nestjs/common';
+import { calculateOrdersPnL } from '@/infrastructure/utils/trading-orders.util';
+import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common';
 import sleep from 'sleep-promise';
+import { TradingBotOrdersService } from '../../trading-bot-orders.service';
 import { BaseTradingBot } from './base-trading-bot';
-
-enum OrderCustomIdPrefix {
-	FIRST_BUY = 'FIRST_BUY',
-	BUY_TRIGGER = 'BUY_TG',
-	STOP_LOSS = 'SL',
-	SELL_ALL = 'SELL_ALL',
-}
 
 @Injectable({ scope: Scope.TRANSIENT })
 export abstract class BaseReverseGridBot
@@ -53,15 +50,18 @@ export abstract class BaseReverseGridBot
 		minPrice: 100_000_000,
 	};
 
+	@Inject(TradingBotOrdersService)
+	private readonly botOrdersService: TradingBotOrdersService;
+
 	// Processes state
 	private isCheckingLastPrice: boolean = false;
 	private isMadeFirstOrder: boolean = false;
 
 	public async start(options: IStartReverseBotOptions): Promise<void> {
 		this.userId = options.userId;
+		this.botId = options.botId;
 		this.config = options.config;
 		this.credentials = options.credentials;
-
 		this.onStateUpdate = options.onStateUpdate;
 
 		await this.postSetConfiguration();
@@ -99,11 +99,18 @@ export abstract class BaseReverseGridBot
 	}
 
 	public async stop(): Promise<void> {
+		if (this.state === BotState.Stopped || this.state === BotState.Stopping)
+			return;
+
 		this.updateState(BotState.Stopping);
 
 		this.snapshots.end = await this.createSnapshot();
 
-		this.state = BotState.Stopped;
+		await this.cancelAllOrders();
+		await this.sellAllBoughtCurrencies().then((res) => {
+			setTimeout(this.cleanUp, 10_000);
+		});
+
 		await this.sendMessage(
 			`------ Открытие ------\n\n` +
 				this.getSnapshotMessage(this.snapshots.start!) +
@@ -111,10 +118,6 @@ export abstract class BaseReverseGridBot
 				`------ Закрытие ------\n\n` +
 				this.getSnapshotMessage(this.snapshots.end!),
 		);
-
-		await this.cancelAllOrders();
-		await this.sellAllBoughtCurrencies();
-		await this.cleanUp();
 
 		this.updateState(BotState.Stopped);
 	}
@@ -125,33 +128,32 @@ export abstract class BaseReverseGridBot
 	}
 
 	protected getCustomOrderId(
-		prefix: OrderCustomIdPrefix,
+		prefix: OrderCreationType,
 		price: number,
 	): string {
-		return `${prefix}_${price}_${Date.now()}`;
+		return `${prefix}-${price}-${Date.now()}`;
 	}
 
 	protected parseCustomOrderId(
 		orderId: string,
-	): { prefix: OrderCustomIdPrefix; price: number } | null {
+	): { prefix: OrderCreationType; price: number } | null {
 		if (!orderId) return null;
 
-		const [prefix, triggerPriceStr] = orderId.split('_');
+		const [prefix, triggerPriceStr] = orderId.split('-');
 		if (!prefix || !triggerPriceStr) return null;
 
 		const triggerPrice = Number(triggerPriceStr);
-		if (!triggerPrice) return null;
+		if (isNaN(triggerPrice)) return null;
 
 		return {
-			prefix: prefix as OrderCustomIdPrefix,
+			prefix: prefix as OrderCreationType,
 			price: triggerPrice,
 		};
 	}
 
 	protected async handleNewFilledOrder(rawOrder: any) {
-		if (this.state !== BotState.Running) return;
+		// if (this.state !== BotState.Running) return;
 		const order = this.parseIncomingOrder(rawOrder);
-
 		const parsedCustomOrderId = this.parseCustomOrderId(order.customId);
 		if (!parsedCustomOrderId) return;
 
@@ -162,24 +164,29 @@ export abstract class BaseReverseGridBot
 			this.config.quoteCurrency.toUpperCase()
 				? Number(order.fee)
 				: Number(order.fee) * Number(order.avgPrice);
+		order.feeCurrency = this.config.quoteCurrency.toUpperCase();
+
+		if (prefix === OrderCreationType.SELL_ALL) {
+			this.cleanUp();
+		}
 
 		if (
-			prefix === OrderCustomIdPrefix.BUY_TRIGGER ||
-			prefix === OrderCustomIdPrefix.STOP_LOSS ||
-			prefix === OrderCustomIdPrefix.FIRST_BUY
+			prefix === OrderCreationType.BUY_TRIGGER ||
+			prefix === OrderCreationType.STOP_LOSS ||
+			prefix === OrderCreationType.FIRST_BUY
 		) {
 			const newOrders: CreateTradingBotOrder[] = [];
 
-			if (order.side === 'buy') {
+			if (order.side === OrderSide.BUY) {
 				newOrders.push({
 					type: 'stop-loss',
 					triggerPrice: triggerPrice - this.config.gridStep,
 					quantity: order.quantity,
 					customId: this.getCustomOrderId(
-						OrderCustomIdPrefix.STOP_LOSS,
+						OrderCreationType.STOP_LOSS,
 						triggerPrice - this.config.gridStep,
 					),
-					side: 'sell',
+					side: OrderSide.SELL,
 					symbol: this.config.symbol,
 				});
 
@@ -193,11 +200,11 @@ export abstract class BaseReverseGridBot
 
 					newOrders.push({
 						type: 'stop-order',
-						side: 'buy',
+						side: OrderSide.BUY,
 						triggerPrice: newTriggerPrice,
 						quantity: order.quantity,
 						customId: this.getCustomOrderId(
-							OrderCustomIdPrefix.BUY_TRIGGER,
+							OrderCreationType.BUY_TRIGGER,
 							newTriggerPrice,
 						),
 						symbol: this.config.symbol,
@@ -210,11 +217,11 @@ export abstract class BaseReverseGridBot
 
 				newOrders.push({
 					type: 'stop-order',
-					side: 'buy',
+					side: OrderSide.BUY,
 					triggerPrice: newTriggerPrice,
 					quantity: order.quantity,
 					customId: this.getCustomOrderId(
-						OrderCustomIdPrefix.BUY_TRIGGER,
+						OrderCreationType.BUY_TRIGGER,
 						newTriggerPrice,
 					),
 					symbol: this.config.symbol,
@@ -226,8 +233,14 @@ export abstract class BaseReverseGridBot
 			this.submitManyOrders(newOrders);
 		}
 
-		this.addNewOrder(order);
-		this.sendNewOrderSummary(order, triggerPrice);
+		this.addNewOrder(order).then(() => {
+			const buyOrdersInSeries = this.getBoughtCountInSeries();
+			if (this.config.takeProfitOnGrid <= buyOrdersInSeries) {
+				this.stop();
+			}
+
+			this.sendNewOrderSummary(order, triggerPrice);
+		});
 	}
 
 	protected updateLastPrice(lastPrice: number) {
@@ -249,11 +262,11 @@ export abstract class BaseReverseGridBot
 				this.triggerPrices.minPrice - this.config.gridStep;
 
 			orders.push({
-				side: 'buy',
+				side: OrderSide.BUY,
 				triggerPrice: newTriggerPrice,
 				type: 'stop-order',
 				customId: this.getCustomOrderId(
-					OrderCustomIdPrefix.BUY_TRIGGER,
+					OrderCreationType.BUY_TRIGGER,
 					newTriggerPrice,
 				),
 				quantity: this.config.gridVolume,
@@ -274,12 +287,13 @@ export abstract class BaseReverseGridBot
 		order: TradingBotOrder,
 		triggerPrice: number,
 	) {
-		const sellCount = this.orders.filter((o) => o.side === 'sell').length;
+		const sellCount = this.orders.filter(
+			(o) => o.side === OrderSide.SELL,
+		).length;
 		const buyCount = this.orders.length - sellCount;
-		// if (buyCount - sellCount >= this.tradeConfig.cancelOnBuyCount) {
-		// 	this.stopProcess();
-		// } else if (orders.length) {
-		const pnl = this.calculatePnL(this.marketData.lastPrice);
+
+		const pnl = calculateOrdersPnL(this.orders, this.marketData.lastPrice);
+
 		const message = `BYBIT
 		📈 **Информация об ордере**
 		- Сторона: ${order.side}
@@ -288,7 +302,7 @@ export abstract class BaseReverseGridBot
 		💰 **Доходность**
 		- Реализованная прибыль: ${pnl.realizedPnL.toFixed(2)}
 		- Нереализованная прибыль: ${pnl.unrealizedPnL.toFixed(2)}
-		- Прибыль: ${(pnl.unrealizedPnL + pnl.realizedPnL).toFixed(2)}
+		- Прибыль: ${pnl.PnL.toFixed(2)}
 		📊 **Текущая торговая статистика**
 		- Текущая цена: ${this.marketData.lastPrice.toFixed(2)}
 		🔄 **Общее количество операций**
@@ -312,58 +326,35 @@ export abstract class BaseReverseGridBot
 	private async sellAllBoughtCurrencies() {
 		let allQuantity = 0;
 		for (const order of this.orders) {
-			if (order.side === 'buy') allQuantity += order.quantity;
+			if (order.side === OrderSide.BUY) allQuantity += order.quantity;
 			else allQuantity -= order.quantity;
 		}
 
 		if (allQuantity > 0) {
 			await this.submitOrder({
-				customId: this.getCustomOrderId(
-					OrderCustomIdPrefix.SELL_ALL,
-					0,
-				),
+				customId: this.getCustomOrderId(OrderCreationType.SELL_ALL, 0),
 				quantity: allQuantity,
-				side: 'sell',
+				side: OrderSide.SELL,
 				symbol: this.config.symbol,
 				type: 'order',
 			});
 		}
 	}
 
-	protected addNewOrder(order: TradingBotOrder) {
+	protected async addNewOrder(order: TradingBotOrder) {
 		this.orders.push(order);
-	}
 
-	protected calculatePnL(currentPrice: number) {
-		const buyStack: TradingBotOrder[] = []; // Stack to track buy orders for stop-losses
-		let realizedPnL = 0;
-		if (!currentPrice && this.orders.length) {
-			currentPrice = this.orders[this.orders.length - 1]!.avgPrice;
-		}
-
-		this.orders.forEach((order) => {
-			if (order.side === 'buy') {
-				buyStack.push(order);
-			} else if (order.side === 'sell' && buyStack.length > 0) {
-				const lastBuy = buyStack.pop();
-				if (lastBuy) {
-					const sellPnL =
-						(order.avgPrice - lastBuy.avgPrice) * order.quantity;
-					realizedPnL += sellPnL;
-				}
-			}
-			realizedPnL -= order.fee;
+		await this.botOrdersService.save(this.botId, {
+			orderId: order.id,
+			avgPrice: order.avgPrice,
+			customId: order.customId,
+			fee: order.fee,
+			feeCurrency: order.feeCurrency,
+			quantity: order.quantity,
+			side: order.side,
+			symbol: order.symbol,
+			createdDate: order.createdDate,
 		});
-		const unrealizedPnL = buyStack.reduce((total, buyOrder) => {
-			return (
-				total + (currentPrice - buyOrder.avgPrice) * buyOrder.quantity
-			);
-		}, 0);
-
-		return {
-			realizedPnL,
-			unrealizedPnL,
-		};
 	}
 
 	private getSnapshotMessage(snapshot: TradingBotSnapshot): string {
@@ -407,9 +398,9 @@ export abstract class BaseReverseGridBot
 			this.updateState(BotState.Running);
 
 			await this.submitOrder({
-				side: 'buy',
+				side: OrderSide.BUY,
 				customId: this.getCustomOrderId(
-					OrderCustomIdPrefix.FIRST_BUY,
+					OrderCreationType.FIRST_BUY,
 					startPrice,
 				),
 				type: 'order',
@@ -470,6 +461,16 @@ export abstract class BaseReverseGridBot
 			datetime: new Date(),
 			walletBalance,
 		};
+	}
+
+	private getBoughtCountInSeries() {
+		let buyCount = this.orders.filter(
+			(order) => order.side === OrderSide.BUY,
+		).length;
+
+		let sellCount = this.orders.length - buyCount;
+
+		return buyCount - sellCount;
 	}
 
 	// init should call makeFirstOrder

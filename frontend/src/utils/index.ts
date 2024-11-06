@@ -1,31 +1,13 @@
-const getElementById = (id: string) => document.getElementById(id)!
+import dateFormat from 'dateformat'
 
-const ketPrefix = 'trading-bot-'
-
-const setLocalStorage = (key: string, value: any): void => {
-  value &&
-    localStorage.setItem(
-      `${ketPrefix}${key}`,
-      typeof value === 'string' ? value : JSON.stringify(value),
-    )
+type FormatDateOptions = {
+  showTime?: boolean
 }
 
-const getLocalStorage = <T>(key: string, isParse = false): T => {
-  const cache = localStorage.getItem(`${ketPrefix}${key}`) ?? ''
-  return isParse ? JSON.parse(cache) : cache
-}
+export const formatDate = (date: Date | string | number, options?: FormatDateOptions): string => {
+  const format = options?.showTime ? 'dd.mm.yyyy HH:MM:ss' : 'dd.mm.yyyy'
 
-const setSessionStorage = (key: string, value: any): void => {
-  value &&
-    sessionStorage.setItem(
-      `${ketPrefix}${key}`,
-      typeof value === 'string' ? value : JSON.stringify(value),
-    )
-}
+  const parsedDate = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
 
-const getSessionStorage = <T>(key: string, isParse = false): T => {
-  const cache = sessionStorage.getItem(`${ketPrefix}${key}`) ?? ''
-  return isParse ? JSON.parse(cache) : cache
+  return dateFormat(parsedDate, format)
 }
-
-export { getElementById, setLocalStorage, getLocalStorage, setSessionStorage, getSessionStorage }

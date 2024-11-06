@@ -10,17 +10,16 @@ type Props = {}
 
 const MainLayout: React.FC<Props> = () => {
   const location = useLocation()
-
-  if (location.pathname === '/') {
-    return <Navigate replace to="/configs" />
-  }
-
   const checkAuth = useAuthStore((store) => store.checkAuth)
   const isAuthChecked = useAuthStore((store) => store.isAuthChecked)
 
   useEffect(() => {
     checkAuth()
   }, [])
+
+  if (location.pathname === '/') {
+    return <Navigate replace to="/configs" />
+  }
 
   return (
     isAuthChecked && (
