@@ -191,7 +191,7 @@ export class TradingBotService {
 
 		const orders = await this.tradingBotOrdersService.findByBotId(botId);
 
-		const pnl = calculateOrdersPnL(orders);
+		const pnl = calculateOrdersPnL(orders, orders[0]?.avgPrice);
 		const buyCount = orders.filter(
 			(order) => order.side === OrderSide.BUY,
 		).length;
