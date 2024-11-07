@@ -28,7 +28,7 @@ export class TradingBotOrdersEntity {
 	@Column({ type: 'real' })
 	quantity: number;
 
-	@Column({ type: 'text', enum: OrderSide })
+	@Column({ type: 'text' })
 	side: OrderSide;
 
 	@Column({ type: 'real' })
