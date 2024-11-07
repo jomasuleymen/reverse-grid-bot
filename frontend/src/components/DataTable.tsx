@@ -9,6 +9,9 @@ interface DataTableProps<Response, DataType> {
 	fetchData: () => Promise<Response>;
 	parseDataSource: (data: Response) => DataType[];
 	tableProps?: TableProps<DataType>;
+	refetchInterval?: number;
+	shouldRefetch?: (data: Response) => boolean
+	refetchOnWindowFocus?: boolean;
 }
 
 function DataTable({
@@ -16,12 +19,20 @@ function DataTable({
 	fetchData,
 	parseDataSource,
 	columns,
+	refetchInterval,
+	shouldRefetch,
+	refetchOnWindowFocus,
 	tableProps = {},
 }: DataTableProps<any, any>) {
 	const { isPending, isSuccess, data } = useQuery<Response>({
 		queryKey,
 		queryFn: () => fetchData(),
-		refetchOnWindowFocus: false,
+		refetchOnWindowFocus: refetchOnWindowFocus || false,
+		refetchInterval: (query): number | false | undefined => {
+			if (!shouldRefetch) return false;
+			
+			return shouldRefetch(query.state.data) ? refetchInterval : false;
+		},
 	});
 
 	const [dataSource, setDataSource] = useState<any[]>([]);

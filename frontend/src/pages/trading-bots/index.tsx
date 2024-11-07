@@ -6,6 +6,10 @@ import StartBotModal from './components/StartBotModal'
 
 type Props = {}
 
+export const TRADING_BOTS_QUERY_KEY = ['trading-bots']
+export const ACTIVE_TRADING_BOTS_QUERY_KEY = [...TRADING_BOTS_QUERY_KEY, 'active']
+export const NON_ACTIVE_TRADING_BOTS_QUERY_KEY = [...TRADING_BOTS_QUERY_KEY, 'non-active']
+
 const TradingBots: React.FC<Props> = ({}) => {
   return (
     <Space direction="vertical" style={{ display: 'flex' }} className="px-4">

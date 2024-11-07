@@ -44,6 +44,7 @@ const getColumns = (config: Props['configs']): ColumnsType<TradingBotOrder> => [
     title: 'Покупная цена',
     dataIndex: 'avgPrice',
     align: 'center',
+    sorter: (a, b) => a.avgPrice - b.avgPrice,
     render: (value) => (
       <span>
         {value.toFixed(2)} {config.quoteCurrency}
@@ -54,6 +55,17 @@ const getColumns = (config: Props['configs']): ColumnsType<TradingBotOrder> => [
     title: 'Сторона',
     dataIndex: 'side',
     align: 'center',
+    filters: [
+      {
+        text: 'BUY',
+        value: TradingOrderSide.BUY,
+      },
+      {
+        text: 'SELL',
+        value: TradingOrderSide.SELL,
+      },
+    ],
+    onFilter: (value, record) => record.side === value,
     render: (value: string) => (
       <Tag color={value === TradingOrderSide.BUY ? 'green' : 'red'}>{value.toUpperCase()}</Tag>
     ),
@@ -72,6 +84,7 @@ const getColumns = (config: Props['configs']): ColumnsType<TradingBotOrder> => [
     title: 'Дата создания',
     dataIndex: 'createdDate',
     align: 'center',
+    sorter: (a, b) => new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime(),
     render: (value: Date) => <span>{formatDate(value, { showTime: true })}</span>,
   },
   {
@@ -109,25 +122,6 @@ const getDescriptionItems = (
         {data.pnl.realizedPnL.toFixed(6)} {config.quoteCurrency}
       </span>
     ),
-  },
-  {
-    label: 'Максимум прибыль',
-    children: (
-      <span>
-        {data.pnl.maxProfit.toFixed(6)} {config.quoteCurrency}
-      </span>
-    ),
-  },
-  {
-    label: 'Максимум убытка',
-    children: (
-      <span>
-        {data.pnl.maxLoss.toFixed(6)} {config.quoteCurrency}
-      </span>
-    ),
-  },
-  {
-    children: null,
   },
   {
     label: 'Сумма комиссии',

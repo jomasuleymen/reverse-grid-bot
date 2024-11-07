@@ -1,0 +1,14 @@
+version: '3.9'
+
+services:
+    redis-cache:
+        image: redis:7.4.1-alpine
+        restart: always
+        ports:
+            - '${REDIS_PORT:-6379}:6379'
+        command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is not specified} --save 300 10
+        volumes:
+            - redis_data:/data
+
+volumes:
+    redis_data:

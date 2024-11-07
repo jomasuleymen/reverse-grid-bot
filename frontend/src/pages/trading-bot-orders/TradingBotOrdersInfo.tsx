@@ -6,11 +6,7 @@ import React, { memo } from 'react'
 import { getBotStateLabel } from '../trading-bots/components/TradingBotsTable'
 
 const getBadgeStatus = (state: TradingBotState): 'processing' | 'default' => {
-  return [TradingBotState.Running, TradingBotState.Initializing, TradingBotState.Stopping].includes(
-    state,
-  )
-    ? 'processing'
-    : 'default'
+  return state === TradingBotState.Running ? 'processing' : 'default'
 }
 
 const getDescriptionItems = (bot: TradingBot): DescriptionsProps['items'] => [
@@ -59,7 +55,6 @@ type Props = {
 }
 
 const TradingBotOrdersInfo: React.FC<Props> = ({ bot }) => {
-
   return (
     <Block className="max-w-full p-6 bg-white shadow-md rounded-md">
       <Descriptions

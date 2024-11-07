@@ -8,6 +8,7 @@ import { IStartBotOptions, TradingBotConfig } from '@/services/trading-bot.servi
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Col, Form, FormItemProps, Modal, Row, Select, Space } from 'antd'
 import React, { useState } from 'react'
+import { TRADING_BOTS_QUERY_KEY } from '..'
 
 const getFormItem = (item: FormItemProps) => {
   return (
@@ -52,7 +53,7 @@ const StartBotModal: React.FC = () => {
   } = useMutation({
     mutationFn: (formData: IStartBotOptions) => SERVICES.TRADING_BOT.startBot(formData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trading-bots'] })
+      queryClient.invalidateQueries({ queryKey: TRADING_BOTS_QUERY_KEY })
       setIsModalOpen(false)
     },
   })

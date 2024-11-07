@@ -14,14 +14,16 @@ export type TradingBotConfig = {
   quoteCurrency: string
   createdAt: string
   stoppedAt: string
+  stopReason?: string
 }
 
 export enum TradingBotState {
   Idle = 1,
   Initializing = 2,
   Running = 3,
-  Stopping = 4,
-  Stopped = 5,
+  Stopped = 4,
+  Stopping = 5,
+  Errored = 6,
 }
 
 export type TradingBot = {
@@ -91,8 +93,6 @@ export interface IBotSummary {
     realizedPnL: number
     unrealizedPnL: number
     PnL: number
-    maxProfit: number
-    maxLoss: number
   }
   buyCount: number
   sellCount: number

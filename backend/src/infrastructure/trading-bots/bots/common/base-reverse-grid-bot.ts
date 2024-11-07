@@ -11,31 +11,38 @@ import {
 	TradingBotSnapshot,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
-import { calculateOrdersPnL } from '@/infrastructure/utils/trading-orders.util';
+import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common';
+import {
+	clearIntervalAsync,
+	setIntervalAsync,
+	SetIntervalAsyncTimer,
+} from 'set-interval-async';
 import sleep from 'sleep-promise';
-import { TradingBotOrdersService } from '../../trading-bot-orders.service';
-import { BaseTradingBot } from './base-trading-bot';
+
+type TradingBotState = BotState.Idle | BotState.Running | BotState.Stopped;
 
 @Injectable({ scope: Scope.TRANSIENT })
-export abstract class BaseReverseGridBot
-	extends BaseTradingBot
-	implements ITradingBot
-{
+export abstract class BaseReverseGridBot implements ITradingBot {
 	protected config: ITradingBotConfig;
 	protected credentials: IExchangeCredentials;
+	protected symbol: string;
 
-	private state: BotState = BotState.Idle;
+	@Inject(LoggerService)
+	protected readonly logger: LoggerService;
+
+	private state: TradingBotState = BotState.Idle;
 	private readonly orders: TradingBotOrder[] = [];
 	private readonly snapshots: {
 		start?: TradingBotSnapshot;
 		end?: TradingBotSnapshot;
 	} = {};
-	private onStateUpdate: (newStatus: BotState) => void;
+
+	private callBacks: IStartReverseBotOptions['callBacks'];
 
 	private readonly minBaseWalletUsdValue = 10;
 	private readonly requestConfig = {
-		maxAttempts: 3,
+		defaultAttempts: 2,
 	};
 	private readonly marketData = {
 		lastPrice: 0,
@@ -50,30 +57,29 @@ export abstract class BaseReverseGridBot
 		minPrice: 100_000_000,
 	};
 
-	@Inject(TradingBotOrdersService)
-	private readonly botOrdersService: TradingBotOrdersService;
-
 	// Processes state
 	private isCheckingLastPrice: boolean = false;
 	private isMadeFirstOrder: boolean = false;
 
+	private checkBotStateTimer: SetIntervalAsyncTimer<any>;
+
 	public async start(options: IStartReverseBotOptions): Promise<void> {
-		this.userId = options.userId;
-		this.botId = options.botId;
 		this.config = options.config;
 		this.credentials = options.credentials;
-		this.onStateUpdate = options.onStateUpdate;
+		this.callBacks = options.callBacks;
+		this.symbol = this.getSymbol(
+			options.config.baseCurrency,
+			options.config.quoteCurrency,
+		);
 
 		await this.postSetConfiguration();
 
-		const isSymbolExists = await this.isExistsSymbol(this.config.symbol);
-		if (!isSymbolExists) {
-			throw new BadRequestException(
-				`Тикер ${this.config.symbol} не найден.`,
-			);
-		}
+		this.callBacks.onStateUpdate(BotState.Initializing, this);
 
-		this.updateState(BotState.Initializing);
+		const isSymbolExists = await this.isExistsSymbol(this.symbol);
+		if (!isSymbolExists) {
+			throw new BadRequestException(`Тикер ${this.symbol} не найден.`);
+		}
 
 		const snapshot = await this.createSnapshot();
 
@@ -93,38 +99,54 @@ export abstract class BaseReverseGridBot
 
 		this.snapshots.start = snapshot;
 
-		await this.sendMessage(this.getSnapshotMessage(this.snapshots.start));
-
 		await this.init();
+
+		this.callBacks.onStateUpdate(BotState.Running, this);
+		this.checkBotStateTimer = setIntervalAsync(
+			() => this.checkBotState(),
+			1000,
+		);
 	}
 
 	public async stop(): Promise<void> {
-		if (this.state === BotState.Stopped || this.state === BotState.Stopping)
-			return;
-
-		this.updateState(BotState.Stopping);
-
-		this.snapshots.end = await this.createSnapshot();
-
-		await this.cancelAllOrders();
-		await this.sellAllBoughtCurrencies().then((res) => {
-			setTimeout(this.cleanUp, 10_000);
-		});
-
-		await this.sendMessage(
-			`------ Открытие ------\n\n` +
-				this.getSnapshotMessage(this.snapshots.start!) +
-				'\n\n' +
-				`------ Закрытие ------\n\n` +
-				this.getSnapshotMessage(this.snapshots.end!),
-		);
-
+		if (this.state === BotState.Stopped) return;
 		this.updateState(BotState.Stopped);
+
+		try {
+			this.callBacks.onStateUpdate(BotState.Stopping, this);
+
+			if (this.checkBotStateTimer) {
+				clearIntervalAsync(this.checkBotStateTimer);
+			}
+
+			this.snapshots.end = await this.createSnapshot();
+
+			const foundBaseCoin = this.snapshots.end.walletBalance.coins.find(
+				(coin) => coin.coin === this.config.baseCurrency,
+			);
+
+			await this.callWithRetry(() => this.cancelAllOrders());
+			this.callWithRetry(() =>
+				this.sellAllBoughtCurrencies(foundBaseCoin?.balance),
+			)
+				.catch((err) => {
+					this.logger.error(
+						'Error while sellong bought currencies',
+						err,
+					);
+				})
+				.finally(() => {
+					this.callBacks.onStateUpdate(BotState.Stopped, this);
+				});
+		} catch (err) {
+			this.logger.error('error while stopping bot', err);
+		} finally {
+			setTimeout(() => this.cleanUp(), 10_000);
+		}
 	}
 
-	protected updateState(newState: BotState) {
+	protected updateState(newState: TradingBotState) {
 		this.state = newState;
-		this.onStateUpdate?.(newState);
 	}
 
 	protected getCustomOrderId(
@@ -152,8 +174,9 @@ export abstract class BaseReverseGridBot
 	}
 
 	protected async handleNewFilledOrder(rawOrder: any) {
-		// if (this.state !== BotState.Running) return;
 		const order = this.parseIncomingOrder(rawOrder);
+		if (order.symbol !== this.symbol) return;
+
 		const parsedCustomOrderId = this.parseCustomOrderId(order.customId);
 		if (!parsedCustomOrderId) return;
 
@@ -166,11 +189,9 @@ export abstract class BaseReverseGridBot
 				: Number(order.fee) * Number(order.avgPrice);
 		order.feeCurrency = this.config.quoteCurrency.toUpperCase();
 
-		if (prefix === OrderCreationType.SELL_ALL) {
-			this.cleanUp();
-		}
-
-		if (
+		if (prefix === OrderCreationType.SELL_ALL) this.cleanUp();
+		else if (this.state !== BotState.Running) return;
+		else if (
 			prefix === OrderCreationType.BUY_TRIGGER ||
 			prefix === OrderCreationType.STOP_LOSS ||
 			prefix === OrderCreationType.FIRST_BUY
@@ -187,7 +208,7 @@ export abstract class BaseReverseGridBot
 						triggerPrice - this.config.gridStep,
 					),
 					side: OrderSide.SELL,
-					symbol: this.config.symbol,
+					symbol: this.symbol,
 				});
 
 				let maxTriggerPrice =
@@ -207,7 +228,7 @@ export abstract class BaseReverseGridBot
 							OrderCreationType.BUY_TRIGGER,
 							newTriggerPrice,
 						),
-						symbol: this.config.symbol,
+						symbol: this.symbol,
 					});
 
 					this.updateTriggerPrices(newTriggerPrice);
@@ -224,7 +245,7 @@ export abstract class BaseReverseGridBot
 						OrderCreationType.BUY_TRIGGER,
 						newTriggerPrice,
 					),
-					symbol: this.config.symbol,
+					symbol: this.symbol,
 				});
 
 				this.updateTriggerPrices(newTriggerPrice);
@@ -233,14 +254,8 @@ export abstract class BaseReverseGridBot
 			this.submitManyOrders(newOrders);
 		}
 
-		this.addNewOrder(order).then(() => {
-			const buyOrdersInSeries = this.getBoughtCountInSeries();
-			if (this.config.takeProfitOnGrid <= buyOrdersInSeries) {
-				this.stop();
-			}
-
-			this.sendNewOrderSummary(order, triggerPrice);
-		});
+		this.addNewOrder(order);
+		this.callBacks.onNewOrder(order, triggerPrice, this.orders);
 	}
 
 	protected updateLastPrice(lastPrice: number) {
@@ -270,7 +285,7 @@ export abstract class BaseReverseGridBot
 					newTriggerPrice,
 				),
 				quantity: this.config.gridVolume,
-				symbol: this.config.symbol,
+				symbol: this.symbol,
 			});
 
 			this.updateTriggerPrices(newTriggerPrice);
@@ -281,35 +296,6 @@ export abstract class BaseReverseGridBot
 		}
 
 		this.isCheckingLastPrice = false;
-	}
-
-	private async sendNewOrderSummary(
-		order: TradingBotOrder,
-		triggerPrice: number,
-	) {
-		const sellCount = this.orders.filter(
-			(o) => o.side === OrderSide.SELL,
-		).length;
-		const buyCount = this.orders.length - sellCount;
-
-		const pnl = calculateOrdersPnL(this.orders, this.marketData.lastPrice);
-
-		const message = `BYBIT
-		📈 **Информация об ордере**
-		- Сторона: ${order.side}
-		- Триггерная цена: ${triggerPrice}
-		- Покупная цена: ${order.avgPrice}
-		💰 **Доходность**
-		- Реализованная прибыль: ${pnl.realizedPnL.toFixed(2)}
-		- Нереализованная прибыль: ${pnl.unrealizedPnL.toFixed(2)}
-		- Прибыль: ${pnl.PnL.toFixed(2)}
-		📊 **Текущая торговая статистика**
-		- Текущая цена: ${this.marketData.lastPrice.toFixed(2)}
-		🔄 **Общее количество операций**
-		- Покупки: ${buyCount}
-		- Продажи: ${sellCount}`;
-
-		this.sendMessage(message);
 	}
 
 	private updateTriggerPrices(price: number) {
@@ -323,77 +309,42 @@ export abstract class BaseReverseGridBot
 		);
 	}
 
-	private async sellAllBoughtCurrencies() {
+	private async sellAllBoughtCurrencies(maxPrice?: number) {
 		let allQuantity = 0;
 		for (const order of this.orders) {
 			if (order.side === OrderSide.BUY) allQuantity += order.quantity;
 			else allQuantity -= order.quantity;
 		}
 
+		if (maxPrice && allQuantity > maxPrice) allQuantity = maxPrice;
+
 		if (allQuantity > 0) {
 			await this.submitOrder({
 				customId: this.getCustomOrderId(OrderCreationType.SELL_ALL, 0),
 				quantity: allQuantity,
 				side: OrderSide.SELL,
-				symbol: this.config.symbol,
+				symbol: this.symbol,
 				type: 'order',
 			});
 		}
 	}
 
-	protected async addNewOrder(order: TradingBotOrder) {
+	protected addNewOrder(order: TradingBotOrder) {
 		this.orders.push(order);
-
-		await this.botOrdersService.save(this.botId, {
-			orderId: order.id,
-			avgPrice: order.avgPrice,
-			customId: order.customId,
-			fee: order.fee,
-			feeCurrency: order.feeCurrency,
-			quantity: order.quantity,
-			side: order.side,
-			symbol: order.symbol,
-			createdDate: order.createdDate,
-		});
-	}
-
-	private getSnapshotMessage(snapshot: TradingBotSnapshot): string {
-		if (!snapshot?.walletBalance) return 'Нету данные';
-
-		const coin = snapshot.walletBalance.coins
-			.map(
-				(c) =>
-					`----- ${c.coin} -----\n` +
-					`Баланс: ${c.balance.toFixed(4)} ${c.coin}\n` +
-					`Баланс(USD): ${c.usdValue.toFixed(1)} USD\n`,
-			)
-			.join('\n');
-
-		return (
-			`Счёт: ${snapshot.walletBalance.accountType}\n` +
-			`Баланс(USD): ${snapshot.walletBalance.balanceInUsd.toFixed(1)}\n` +
-			`\n${coin}\n` +
-			`Цена ${this.config.symbol}: ${snapshot.currentPrice}\n` +
-			`Время: ${snapshot.datetime.toLocaleString('ru-RU', {
-				timeZone: 'Asia/Almaty',
-			})}`
-		);
+		const buyOrdersInSeries = this.getBoughtCountInSeries();
+		if (this.config.takeProfitOnGrid <= buyOrdersInSeries) {
+			this.stop();
+		}
 	}
 
 	protected async makeFirstOrder() {
 		if (this.isMadeFirstOrder) return;
 		this.isMadeFirstOrder = true;
 
-		if (
-			this.state !== BotState.Idle &&
-			this.state !== BotState.Initializing
-		)
-			return;
+		if (this.state !== BotState.Idle) return;
 
 		try {
-			const startPrice = await this.getTickerLastPrice(
-				this.config.symbol,
-			);
+			const startPrice = await this.getTickerLastPrice(this.symbol);
 			this.updateTriggerPrices(startPrice);
 			this.updateState(BotState.Running);
 
@@ -405,35 +356,33 @@ export abstract class BaseReverseGridBot
 				),
 				type: 'order',
 				quantity: this.config.gridVolume,
-				symbol: this.config.symbol,
+				symbol: this.symbol,
 			});
 		} catch (err) {
-			console.log('ERROR while makeFirstOrders', err);
+			this.logger.error('ERROR while makeFirstOrders', err);
 		}
 	}
-	private async retrySubmitOrders(
-		submitOrderCallback: () => Promise<void>,
-		attempts = this.requestConfig.maxAttempts,
-	) {
+	private async callWithRetry(
+		callback: () => Promise<void>,
+		attempts = this.requestConfig.defaultAttempts,
+	): Promise<boolean> {
 		while (attempts > 0) {
 			try {
-				await submitOrderCallback();
-				return;
+				await callback();
+				return true;
 			} catch (error) {
-				console.error(
-					`Error placing order, attempts left: ${attempts - 1}`,
+				this.logger.error(
+					`Error callWithRetry, attempts left: ${attempts - 1}`,
 					error,
 				);
 				attempts -= 1;
-				if (attempts === 0) {
-					console.error(
-						'Max retry attempts reached. Order placement failed.',
-					);
-					return;
-				}
+				if (attempts === 0) return false;
+
 				await sleep(1000); // delay before retry
 			}
 		}
+
+		return false;
 	}
 
 	private async submitManyOrders(orders: CreateTradingBotOrder[]) {
@@ -441,19 +390,29 @@ export abstract class BaseReverseGridBot
 
 		const rawOrders = orders.map(this.getCreateOrderParams);
 
-		await this.retrySubmitOrders(() =>
+		await this.callWithRetry(() =>
 			this.submitManyOrdersImpl(rawOrders),
-		);
+		).then((res) => {
+			if (res) {
+				this.logger.info('Orders placed successfully', orders);
+			}
+		});
 	}
 
 	private async submitOrder(order: CreateTradingBotOrder) {
 		const rawOrder = this.getCreateOrderParams(order);
 
-		await this.retrySubmitOrders(() => this.submitOrderImpl(rawOrder));
+		await this.callWithRetry(() => this.submitOrderImpl(rawOrder)).then(
+			(res) => {
+				if (res) {
+					this.logger.info('Order placed successfully', order);
+				}
+			},
+		);
 	}
 
 	protected async createSnapshot(): Promise<TradingBotSnapshot> {
-		const currentPrice = await this.getTickerLastPrice(this.config.symbol);
+		const currentPrice = await this.getTickerLastPrice(this.symbol);
 		const walletBalance = await this.getWalletBalance();
 
 		return {
@@ -473,6 +432,17 @@ export abstract class BaseReverseGridBot
 		return buyCount - sellCount;
 	}
 
+	private async checkBotState() {
+		const state = await this.callBacks.checkBotState();
+		if (state === BotState.Stopped || state === BotState.Stopping) {
+			await this.stop();
+		}
+	}
+
+	public getSnapshots() {
+		return this.snapshots;
+	}
+
 	// init should call makeFirstOrder
 	protected abstract init(): Promise<void>;
 	protected abstract postSetConfiguration(): Promise<void>;
@@ -488,4 +458,9 @@ export abstract class BaseReverseGridBot
 
 	protected abstract getCreateOrderParams(order: CreateTradingBotOrder): any;
 	protected abstract parseIncomingOrder(order: any): TradingBotOrder;
+
+	protected abstract getSymbol(
+		baseCurrency: string,
+		quoteCurrency: string,
+	): string;
 }

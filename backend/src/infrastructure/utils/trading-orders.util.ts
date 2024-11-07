@@ -12,8 +12,6 @@ export function calculateOrdersPnL(
 ) {
 	const buyStack: CalclatePnlOrderType[] = []; // Stack to track buy orders for stop-losses
 	let realizedPnL = 0;
-	let maxProfit = 0;
-	let maxLoss = 0;
 
 	if (!currentPrice && orders.length) {
 		currentPrice = orders[orders.length - 1]!.avgPrice;
@@ -28,17 +26,9 @@ export function calculateOrdersPnL(
 				const sellPnL =
 					(order.avgPrice - lastBuy.avgPrice) * order.quantity;
 				realizedPnL += sellPnL;
-
-				// Update max profit and max loss based on the current realizedPnL
-				if (realizedPnL > maxProfit) maxProfit = realizedPnL;
-				if (realizedPnL < maxLoss) maxLoss = realizedPnL;
 			}
 		}
 		realizedPnL -= order.fee;
-
-		// Update max profit and max loss after deducting the fee
-		if (realizedPnL > maxProfit) maxProfit = realizedPnL;
-		if (realizedPnL < maxLoss) maxLoss = realizedPnL;
 	});
 
 	const unrealizedPnL = buyStack.reduce((total, buyOrder) => {
@@ -49,7 +39,5 @@ export function calculateOrdersPnL(
 		realizedPnL,
 		unrealizedPnL,
 		PnL: realizedPnL + unrealizedPnL,
-		maxProfit,
-		maxLoss,
 	};
 }

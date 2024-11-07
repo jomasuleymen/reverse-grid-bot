@@ -63,6 +63,9 @@ export class TradingBotEntity {
 	@Column({ nullable: true })
 	stoppedAt: Date;
 
+	@Column({ nullable: true })
+	stopReason: string;
+
 	@OneToMany(() => TradingBotOrdersEntity, (orders) => orders.bot, {
 		cascade: ['insert', 'update'],
 	})

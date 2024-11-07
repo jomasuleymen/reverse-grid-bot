@@ -3,10 +3,19 @@ import DataTable from '@/components/DataTable'
 import { SERVICES } from '@/services'
 import { ITradingBotFilter, TradingBot, TradingBotState } from '@/services/trading-bot.service'
 import { formatDate } from '@/utils'
-import { Space } from 'antd'
+import { useQueryClient } from '@tanstack/react-query'
+import { Space, Typography } from 'antd'
 import { ColumnsType } from 'antd/es/table'
+import { BaseType } from 'antd/es/typography/Base'
 import React from 'react'
 import { Link } from 'react-router-dom'
+import {
+  ACTIVE_TRADING_BOTS_QUERY_KEY,
+  NON_ACTIVE_TRADING_BOTS_QUERY_KEY,
+  TRADING_BOTS_QUERY_KEY,
+} from '..'
+
+const { Text, Link: LinkStyle } = Typography
 
 type ColumnType = TradingBot & {
   key: number
@@ -14,23 +23,25 @@ type ColumnType = TradingBot & {
 
 type StateLabel = {
   label: string
-  color: string
+  color: BaseType
 }
 
 export function getBotStateLabel(state: TradingBotState): StateLabel {
   switch (state) {
     case TradingBotState.Idle:
-      return { label: 'Ожидание', color: 'grey-500' }
+      return { label: 'Ожидание', color: 'secondary' }
     case TradingBotState.Initializing:
-      return { label: 'Инициализация', color: 'blue-500' }
+      return { label: 'Инициализация', color: 'secondary' }
     case TradingBotState.Running:
-      return { label: 'Запущен', color: 'green-500' }
+      return { label: 'Запущен', color: 'success' }
     case TradingBotState.Stopping:
-      return { label: 'Остановка', color: 'orange-500' }
+      return { label: 'Остановка', color: 'warning' }
     case TradingBotState.Stopped:
-      return { label: 'Остановлен', color: 'red-500' }
+      return { label: 'Остановлено', color: 'warning' }
+    case TradingBotState.Errored:
+      return { label: 'Ошибка', color: 'danger' }
     default:
-      return { label: 'Неизвестное состояние', color: 'black' }
+      return { label: 'Неизвестное состояние', color: 'secondary' }
   }
 }
 
@@ -59,6 +70,7 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
   {
     title: 'Символ',
     align: 'center',
+    dataIndex: 'baseCurrency',
     render: (_, record) => {
       return <span>{record.baseCurrency + record.quoteCurrency}</span>
     },
@@ -103,7 +115,11 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     render: (_, record: ColumnType) => {
       const labelData = getBotStateLabel(record.state)
 
-      return <span className={`text-${labelData.color}`}>{labelData.label}</span>
+      return (
+        <Text color="#00000" type={labelData.color} className={`text-${labelData.color}`}>
+          {labelData.label} {record.state === TradingBotState.Errored && `(${record.stopReason})`}
+        </Text>
+      )
     },
   },
   {
@@ -111,18 +127,18 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     key: 'action',
     render: (_, record: ColumnType) => (
       <Space>
-        {record.state !== TradingBotState.Stopped && record.state !== TradingBotState.Stopping && (
+        {[TradingBotState.Running].includes(record.state) && (
           <ConfirmModal
             modalTitle="Остановить бота?"
             onOk={() => SERVICES.TRADING_BOT.stopBot(record.id)}
-            invalidateQueryKey={['trading-bots']}
+            invalidateQueryKey={TRADING_BOTS_QUERY_KEY}
             actionText="Остановить"
             cancelText="Отмена"
             okText="Остановить"
             okType="danger"
           />
         )}
-        <Link className="" to={`${record.id}/orders`}>
+        <Link className="text-blue-500" to={`${record.id}/orders`}>
           Детали
         </Link>
       </Space>
@@ -137,12 +153,31 @@ type Props = {
 }
 
 const TradingBotsTable: React.FC<Props> = ({ options, queryKey }) => {
+  const queryClient = useQueryClient()
+
   return (
     <DataTable
       fetchData={() => SERVICES.TRADING_BOT.fetchAll(options)}
       queryKey={queryKey}
       parseDataSource={parseDataSource}
       columns={getColumns(queryKey)}
+      refetchOnWindowFocus={true}
+      refetchInterval={2000}
+      shouldRefetch={() => {
+        const activeTradingBots =
+          (queryClient.getQueryState(ACTIVE_TRADING_BOTS_QUERY_KEY)?.data as Array<any>) || []
+        const nonActiveTradingBots =
+          (queryClient.getQueryState(NON_ACTIVE_TRADING_BOTS_QUERY_KEY)?.data as Array<any>) || []
+
+        const data = [...activeTradingBots, ...nonActiveTradingBots.slice(0, 5)]
+
+        return (
+          data.findIndex(
+            (bot) =>
+              bot.state === TradingBotState.Initializing || bot.state === TradingBotState.Stopping,
+          ) !== -1
+        )
+      }}
     />
   )
 }

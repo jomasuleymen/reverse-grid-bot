@@ -10,6 +10,7 @@ import { TradingBotEntity } from './entities/trading-bots.entity';
 import { TradingBotOrdersService } from './trading-bot-orders.service';
 import { TradingBotsController } from './trading-bots.controller';
 import { TradingBotService } from './trading-bots.service';
+import { BullServiceModule } from '../services/bull/bull.module';
 
 const PROVIDERS: Provider[] = [
 	TradingBotService,
@@ -19,6 +20,7 @@ const PROVIDERS: Provider[] = [
 
 @Module({
 	imports: [
+		BullServiceModule,
 		TradingConfigurationsModule,
 		ExchangesModule,
 		TypeOrmModule.forFeature([TradingBotEntity, TradingBotOrdersEntity]),
@@ -26,6 +28,6 @@ const PROVIDERS: Provider[] = [
 	],
 	controllers: [TradingBotsController],
 	providers: [...TRADING_BOTS, ...PROVIDERS],
-	exports: [...PROVIDERS],
+	exports: [...TRADING_BOTS, ...PROVIDERS],
 })
 export class TradingBotModule {}

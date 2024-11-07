@@ -1,3 +1,4 @@
+import { BaseReverseGridBot } from '@/infrastructure/trading-bots/bots/common/base-reverse-grid-bot';
 import { ExchangeEnum, OrderSide } from '../exchanges/common.interface';
 import { WalletBalance } from './wallet.interface';
 
@@ -42,7 +43,6 @@ export enum ExchangeCredentialsType {
 export interface ITradingBotConfig {
 	baseCurrency: string;
 	quoteCurrency: string;
-	symbol: string;
 	takeProfitOnGrid: number;
 	gridStep: number;
 	gridVolume: number;
@@ -60,16 +60,27 @@ export enum BotState {
 	Idle = 1,
 	Initializing = 2,
 	Running = 3,
-	Stopping = 4,
-	Stopped = 5,
+	Stopped = 4,
+	Stopping = 5,
+	Errored = 6,
 }
 
 export interface IStartReverseBotOptions {
-	userId: number;
-	botId: number;
 	config: ITradingBotConfig;
 	credentials: IExchangeCredentials;
-	onStateUpdate: (newStatus: BotState) => void;
+	callBacks: {
+		checkBotState: () => Promise<BotState>;
+		onNewOrder: (
+			order: TradingBotOrder,
+			triggerPrice: number,
+			orders: TradingBotOrder[],
+		) => Promise<void>;
+
+		onStateUpdate: (
+			state: BotState,
+			bot: BaseReverseGridBot,
+		) => Promise<void>;
+	};
 }
 
 export interface ITradingBot {

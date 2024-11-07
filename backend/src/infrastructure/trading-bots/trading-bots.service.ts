@@ -3,17 +3,22 @@ import {
 	OrderSide,
 } from '@/domain/interfaces/exchanges/common.interface';
 import {
+	IStartTradingBotQueueData,
+	IStopTradingBotQueueData,
+} from '@/domain/interfaces/trading-bots/trading-bot-job.interface';
+import {
 	BotState,
-	IExchangeCredentials,
 	ITradingBot,
+	TradingBotSnapshot,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
-import LoggerService from '@/infrastructure/services/logger/logger.service';
+import { InjectQueue } from '@nestjs/bullmq';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Equal, FindOptionsWhere, Not, Repository } from 'typeorm';
+import { Queue } from 'bullmq';
+import { Equal, FindOptionsWhere, In, Or, Repository } from 'typeorm';
 import { ExchangeCredentialsService } from '../exchanges/exchange-credentials/exchange-credentials.service';
-import { BybitService } from '../exchanges/modules/bybit/bybit.service';
+import { QUEUES } from '../services/bull/bull.const';
 import { calculateOrdersPnL } from '../utils/trading-orders.util';
 import { BybitSpotReverseGridBot } from './bots/bybit/spot-reverse-grid-bot';
 import { GetTradingBotsDto } from './dto/get-bots.dto';
@@ -23,16 +28,16 @@ import { TradingBotOrdersService } from './trading-bot-orders.service';
 
 @Injectable()
 export class TradingBotService {
-	private readonly bots: Record<number, ITradingBot> = {};
-
 	constructor(
+		private moduleRef: ModuleRef,
 		@InjectRepository(TradingBotEntity)
 		private readonly tradingBotRepo: Repository<TradingBotEntity>,
 		private readonly exchangeCredentialsService: ExchangeCredentialsService,
 		private readonly tradingBotOrdersService: TradingBotOrdersService,
-		private readonly loggerService: LoggerService,
-		private readonly bybitService: BybitService,
-		private moduleRef: ModuleRef,
+		@InjectQueue(QUEUES.TRADING_BOT_START)
+		private tradingBotStartQueue: Queue<IStartTradingBotQueueData>,
+		@InjectQueue(QUEUES.TRADING_BOT_STOP)
+		private tradingBotStopQueue: Queue<IStopTradingBotQueueData>,
 	) {}
 
 	async startBot(userId: number, options: StartBotDto): Promise<void> {
@@ -40,27 +45,42 @@ export class TradingBotService {
 			userId,
 			options.credentialsId,
 		);
-		const botEntity = await this.createBotEntity(
-			userId,
-			credentials,
-			options,
-		);
-		const bot = await this.getBotInstance(botEntity.exchange);
 
-		await this.startBotInstance(bot, botEntity, credentials, options);
+		const activeBot = await this.tradingBotRepo.findOneBy({
+			userId,
+			state: In([
+				BotState.Running,
+				BotState.Idle,
+				BotState.Initializing,
+				BotState.Stopping,
+			]),
+		});
+
+		if (activeBot) throw new BadRequestException('У вас активный бот');
+
+		const botEntity = await this.save({
+			userId: userId,
+			credentialsId: credentials.id,
+			exchange: credentials.exchange,
+			type: credentials.type,
+			gridStep: options.gridStep,
+			gridVolume: options.gridVolume,
+			takeProfitOnGrid: options.takeProfitOnGrid,
+			baseCurrency: options.baseCurrency,
+			quoteCurrency: options.quoteCurrency,
+		});
+
+		await this.tradingBotStartQueue.add('start', {
+			botId: botEntity.id,
+		});
 	}
 
 	async stopBot(userId: number, botId: number): Promise<void> {
-		const bot = this.bots[botId];
-		if (!bot) {
-			await this.updateBotState(botId, BotState.Stopped);
-			return;
-		}
-
-		await this.stopBotInstance(bot, botId);
+		await this.tradingBotStopQueue.add('stop', {
+			botId,
+		});
 	}
 
-	// Helper Methods
 	private async getCredentials(userId: number, credentialsId: number) {
 		const credentials =
 			await this.exchangeCredentialsService.findById(credentialsId);
@@ -71,85 +91,8 @@ export class TradingBotService {
 		return credentials;
 	}
 
-	private async createBotEntity(
-		userId: number,
-		credentials: IExchangeCredentials,
-		options: StartBotDto,
-	) {
-		return this.tradingBotRepo.save({
-			userId,
-			credentialsId: credentials.id,
-			exchange: credentials.exchange,
-			type: credentials.type,
-			gridStep: options.gridStep,
-			gridVolume: options.gridVolume,
-			takeProfitOnGrid: options.takeProfitOnGrid,
-			baseCurrency: options.baseCurrency,
-			quoteCurrency: options.quoteCurrency,
-			symbol: `${options.baseCurrency}${options.quoteCurrency}`,
-		});
-	}
-
-	private async getBotInstance(exchange: ExchangeEnum): Promise<ITradingBot> {
-		switch (exchange) {
-			case ExchangeEnum.Bybit:
-				return await this.moduleRef.resolve(BybitSpotReverseGridBot);
-			default:
-				throw new Error('Биржа не поддерживается');
-		}
-	}
-
-	private async startBotInstance(
-		bot: ITradingBot,
-		botEntity: TradingBotEntity,
-		credentials: IExchangeCredentials,
-		options: StartBotDto,
-	) {
-		try {
-			await bot.start({
-				config: {
-					...options,
-					symbol: `${options.baseCurrency}${options.quoteCurrency}`,
-				},
-				credentials,
-				userId: botEntity.userId,
-				botId: botEntity.id,
-				onStateUpdate: async (state: BotState) =>
-					await this.updateBotState(botEntity.id, state),
-			});
-			this.bots[botEntity.id] = bot;
-		} catch (err) {
-			this.handleError('Ошибка при запуске бота:', err, botEntity.id);
-			await bot.stop();
-		}
-	}
-
-	private async stopBotInstance(bot: ITradingBot, botId: number) {
-		try {
-			await bot.stop();
-		} catch (err) {
-			this.loggerService.error('Ошибка при остановке бота:', err);
-			throw new BadRequestException('Ошибка при остановке бота');
-		} finally {
-			delete this.bots[botId];
-			await this.updateBotState(botId, BotState.Stopped);
-		}
-	}
-
-	private async updateBotState(botId: number, state: BotState) {
-		if (state === BotState.Stopped && this.bots[botId])
-			delete this.bots[botId];
-
-		await this.tradingBotRepo.update(botId, {
-			state,
-			stoppedAt: state === BotState.Stopped ? new Date() : undefined,
-		});
-	}
-
-	private handleError(message: string, error: any, botId?: number) {
-		this.loggerService.error(message, error);
-		if (botId) this.updateBotState(botId, BotState.Stopped);
-		throw new BadRequestException(error.message || message);
+	public async save(data: Partial<TradingBotEntity>) {
+		return await this.tradingBotRepo.save(data);
 	}
 
 	public async findBotsByUserId(userId: number, payload?: GetTradingBotsDto) {
@@ -159,8 +102,13 @@ export class TradingBotService {
 				payload?.isActive === undefined
 					? undefined
 					: payload.isActive
-						? Not(Equal(BotState.Stopped))
-						: Equal(BotState.Stopped),
+						? Or(
+								Equal(BotState.Idle),
+								Equal(BotState.Initializing),
+								Equal(BotState.Running),
+								Equal(BotState.Stopping),
+							)
+						: Or(Equal(BotState.Stopped), Equal(BotState.Errored)),
 		};
 
 		return this.tradingBotRepo.find({ where, order: { id: 'DESC' } });
@@ -202,5 +150,47 @@ export class TradingBotService {
 			sellCount: orders.length - buyCount,
 			sumComission: orders.reduce((prev, curr) => prev + curr.fee, 0),
 		};
+	}
+
+	public async update(botId: number, data: Partial<TradingBotEntity>) {
+		return await this.tradingBotRepo.update(botId, data);
+	}
+
+	public async getBotStatus(botId: number) {
+		const bot = await this.findBotById(botId);
+		if (!bot) throw new Error('Бот не найден');
+
+		return bot.state;
+	}
+
+	public getSnapshotMessage(snapshot: TradingBotSnapshot): string {
+		if (!snapshot?.walletBalance) return 'Нету данные';
+
+		const coin = snapshot.walletBalance.coins
+			.map(
+				(c) =>
+					`----- ${c.coin} -----\n` +
+					`Баланс: ${c.balance.toFixed(4)} ${c.coin}\n` +
+					`Баланс(USD): ${c.usdValue.toFixed(1)} USD\n`,
+			)
+			.join('\n');
+
+		return (
+			`Счёт: ${snapshot.walletBalance.accountType}\n` +
+			`Баланс(USD): ${snapshot.walletBalance.balanceInUsd.toFixed(1)}\n` +
+			`\n${coin}\n` +
+			`Время: ${snapshot.datetime.toLocaleString('ru-RU', {
+				timeZone: 'Asia/Almaty',
+			})}`
+		);
+	}
+
+	public async getBotInstance(exchange: ExchangeEnum): Promise<ITradingBot> {
+		switch (exchange) {
+			case ExchangeEnum.Bybit:
+				return await this.moduleRef.resolve(BybitSpotReverseGridBot);
+			default:
+				throw new Error('Биржа не поддерживается');
+		}
 	}
 }

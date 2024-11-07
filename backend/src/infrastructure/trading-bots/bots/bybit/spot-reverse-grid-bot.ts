@@ -6,7 +6,6 @@ import {
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
 import { BybitService } from '@/infrastructure/exchanges/modules/bybit/bybit.service';
-import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { Injectable, Scope } from '@nestjs/common';
 import {
 	BatchOrderParamsV5,
@@ -31,10 +30,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 
 	private readonly accountType: WalletBalanceV5['accountType'] = 'UNIFIED';
 
-	constructor(
-		private readonly loggerService: LoggerService,
-		private readonly bybitService: BybitService,
-	) {
+	constructor(private readonly bybitService: BybitService) {
 		super();
 	}
 
@@ -46,8 +42,6 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			key: this.credentials.apiKey,
 			secret: this.credentials.apiSecret,
 			demoTrading: isTestnet,
-			parseAPIRateLimits: true,
-			recv_window: 10_000,
 		});
 
 		this.wsClient = new WebsocketClient({
@@ -65,17 +59,14 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	protected async init() {
 		this.configureWsEmits();
 
-		await this.wsClient.subscribeV5('order', 'spot');
-		await this.publicWsClient.subscribeV5(
-			`tickers.${this.config.symbol}`,
-			'spot',
-		);
+		this.wsClient.subscribeV5('order', 'spot');
+		this.publicWsClient.subscribeV5(`tickers.${this.symbol}`, 'spot');
 	}
 
 	private configureWsEmits() {
 		this.publicWsClient.on('update', (data) => {
 			if (!data) return;
-			if (data.topic === `tickers.${this.config.symbol}`) {
+			if (data.topic === `tickers.${this.symbol}`) {
 				if (data.data) {
 					const lastPrice = Number(data.data.lastPrice);
 					this.updateLastPrice(lastPrice);
@@ -96,7 +87,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		});
 
 		this.wsClient.on('open', () => {
-			this.loggerService.info('WS OPENED');
+			this.logger.info('WS OPENED');
 		});
 
 		this.wsClient.on('response', (data) => {
@@ -108,11 +99,11 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		});
 
 		this.wsClient.on('reconnect', (data) => {
-			this.loggerService.info('ws reconnecting.... ');
+			this.logger.info('ws reconnecting.... ');
 		});
 
 		this.wsClient.on('reconnected', (data) => {
-			this.loggerService.info('ws reconnected ');
+			this.logger.info('ws reconnected ');
 		});
 	}
 
@@ -126,37 +117,35 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	}
 
 	protected async cancelAllOrders(): Promise<void> {
-		await this.restClient
-			.cancelAllOrders({
+		await Promise.all([
+			this.restClient.cancelAllOrders({
 				category: 'spot',
 				orderFilter: 'StopOrder',
-			})
-			.then((res) => {
-				this.loggerService.info('stop.StopOrder', res);
-			});
-		await this.restClient
-			.cancelAllOrders({
+			}),
+			this.restClient.cancelAllOrders({
 				category: 'spot',
 				orderFilter: 'tpslOrder',
-			})
-			.then((res) => {
-				this.loggerService.info('stop.tpslOrder', res);
-			});
+			}),
+		]).then((res) => {
+			this.logger.info('stop.cancelAllOrders', res);
+		});
 	}
 
 	protected async cleanUp() {
 		if (this.wsClient) {
 			this.wsClient.closeAll(true);
 			this.wsClient.removeAllListeners();
-			// @ts-ignore
-			this.wsClient = null;
 		}
+
 		if (this.publicWsClient) {
 			this.publicWsClient.closeAll(true);
 			this.publicWsClient.removeAllListeners();
-			// @ts-ignore
-			this.publicWsClient = null;
 		}
+
+		// @ts-ignore
+		this.wsClient = null;
+		// @ts-ignore
+		this.publicWsClient = null;
 	}
 
 	protected async getWalletBalance(): Promise<WalletBalance> {
@@ -222,7 +211,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			feeCurrency: order.feeCurrency,
 			quantity: Number(order.qty),
 			side: order.side === 'Buy' ? OrderSide.BUY : OrderSide.SELL,
-			symbol: this.config.symbol,
+			symbol: this.symbol,
 			createdDate: new Date(Number(order.updatedTime) || 0),
 		};
 	}
@@ -230,7 +219,6 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	protected async submitOrderImpl(orderParams: OrderParamsV5): Promise<void> {
 		const response = await this.restClient.submitOrder(orderParams);
 		if (response.retCode === 0) {
-			this.loggerService.info('Order placed successfully:', response);
 			return;
 		} else {
 			throw new Error(response.retMsg);
@@ -245,7 +233,6 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			ordersParams,
 		);
 		if (response.retCode === 0) {
-			this.loggerService.info('Orders placed successfully');
 		} else {
 			throw new Error(response.retMsg);
 		}
@@ -253,5 +240,9 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 
 	protected async getTickerLastPrice(ticker: string): Promise<number> {
 		return this.bybitService.getTickerLastPrice('spot', ticker);
+	}
+
+	protected getSymbol(baseCurrency: string, quoteCurrency: string): string {
+		return baseCurrency + quoteCurrency;
 	}
 }
