@@ -129,17 +129,9 @@ export class TradingBotService {
 
 		if (!bot) throw new BadRequestException('Бот не найден');
 
-		// const [orders, latestPrice] = await Promise.all([
-		// 	await this.tradingBotOrdersService.findByBotId(botId),
-		// 	await this.bybitService.getTickerLastPrice(
-		// 		'spot',
-		// 		bot.baseCurrency + bot.quoteCurrency,
-		// 	),
-		// ]);
-
 		const orders = await this.tradingBotOrdersService.findByBotId(botId);
 
-		const pnl = calculateOrdersPnL(orders, orders[0]?.avgPrice);
+		const pnl = calculateOrdersPnL(orders);
 		const buyCount = orders.filter(
 			(order) => order.side === OrderSide.BUY,
 		).length;
@@ -148,7 +140,6 @@ export class TradingBotService {
 			pnl,
 			buyCount,
 			sellCount: orders.length - buyCount,
-			sumComission: orders.reduce((prev, curr) => prev + curr.fee, 0),
 		};
 	}
 

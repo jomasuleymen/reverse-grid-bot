@@ -1,50 +1,50 @@
-import { MyContext } from '@/domain/adapters/telegram.interface';
-import { NotificationModule } from '@/infrastructure/notification/notification.module';
-import { TradingBotModule } from '@/infrastructure/trading-bots/trading-bots.module';
-import { UserModule } from '@/infrastructure/user/user.module';
 import {
-	forwardRef,
-	Module,
-	OnModuleDestroy,
-	OnModuleInit,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { InjectBot, TelegrafModule } from 'nestjs-telegraf';
-import { session, Telegraf } from 'telegraf';
+	IBotCallbackQuery,
+	IBotCommand,
+} from '@/domain/adapters/telegram.interface';
+import { NotificationModule } from '@/infrastructure/notification/notification.module';
+import { UserModule } from '@/infrastructure/user/user.module';
+import { Global, Module, OnModuleInit, Provider } from '@nestjs/common';
+import { DiscoveryModule, DiscoveryService } from '@nestjs/core';
+import { CONNECT_TO_ACCOUNT_COMMANDS } from './commands/trading-bot/connect.command';
 import { TelegramService } from './telegram.service';
-import { TradingBotUpdate } from './trading-bot/telegram-bot.update';
 
+const COMMANDS: Provider[] = [...CONNECT_TO_ACCOUNT_COMMANDS];
+
+@Global()
 @Module({
-	imports: [
-		UserModule,
-		forwardRef(() => TradingBotModule),
-		NotificationModule,
-		TelegrafModule.forRootAsync({
-			inject: [ConfigService],
-			useFactory: (configService: ConfigService) => ({
-				token: configService.getOrThrow<string>('telegram.bot.token'),
-				launchOptions: {
-					dropPendingUpdates: true,
-				},
-				middlewares: [session()],
-				options: { telegram: { apiMode: 'bot' } },
-			}),
-		}),
-	],
-	providers: [TelegramService, TradingBotUpdate],
+	imports: [DiscoveryModule, UserModule, NotificationModule],
+	providers: [...COMMANDS, TelegramService],
 	exports: [TelegramService],
 })
-export class TelegramModule implements OnModuleDestroy, OnModuleInit {
+export class TelegramModule implements OnModuleInit {
 	constructor(
-		@InjectBot() private bot: Telegraf<MyContext>,
 		private readonly telegramService: TelegramService,
+		private readonly discoveryService: DiscoveryService,
 	) {}
 
-	onModuleInit() {
-		this.telegramService.updateBotCommands();
+	async onModuleInit() {
+		this.initializeCommands();
+		this.initializeCallbackQueries();
 	}
 
-	onModuleDestroy() {
-		this.bot?.stop?.();
+	private initializeCommands() {
+		const commands = this.findProvidersByClass<IBotCommand>(IBotCommand);
+		this.telegramService.setCommands(commands);
+	}
+
+	private initializeCallbackQueries() {
+		const callbackQueries =
+			this.findProvidersByClass<IBotCallbackQuery>(IBotCallbackQuery);
+		this.telegramService.useCallbackQueries(callbackQueries);
+	}
+
+	private findProvidersByClass<T>(abstractClass: Function): T[] {
+		return this.discoveryService
+			.getProviders()
+			.map((wrapper) => wrapper.instance)
+			.filter(
+				(instance): instance is T => instance instanceof abstractClass,
+			);
 	}
 }

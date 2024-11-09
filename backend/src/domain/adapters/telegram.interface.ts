@@ -1,18 +1,19 @@
-import { Context, Scenes } from 'telegraf';
+import { Injectable } from '@nestjs/common';
+import TelegramBot from 'node-telegram-bot-api';
 
-export class MyContext<S = any> extends Context {
-	user: {
-		id: number;
-	};
-	scene: Scenes.SceneContextScene<MyContext<S>, Scenes.WizardSessionData & S>;
-	wizard: Scenes.WizardContextWizard<MyContext<S>>;
+@Injectable()
+export abstract class IBotCommand {
+	command: string;
+	description: string;
+
+	abstract exec(msg: TelegramBot.Message, bot: TelegramBot): Promise<any>;
 }
 
-export interface ITelegramBotButton {
-	text: string;
-	callbackData: string;
+@Injectable()
+export abstract class IBotCallbackQuery {
+	abstract isMatch(data: string): boolean;
+	abstract exec(
+		query: TelegramBot.CallbackQuery,
+		bot: TelegramBot,
+	): Promise<any>;
 }
-
-export const WIZARDS = {
-	TRADING_EDIT_CONFIG: 'TRADING_EDIT_CONFIG',
-};

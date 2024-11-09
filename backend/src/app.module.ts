@@ -8,7 +8,11 @@ import passport from 'passport';
 import { BackgroundModule } from './background/backgroud.module';
 import { getConfigModuleOptions } from './configs/config-service';
 import { getRedisOptions } from './configs/redis';
-import { getTypeOrmModuleOptions } from './configs/typeorm';
+import {
+	DATABASES,
+	getMainOrmOptions,
+	getServiceOrmOptions,
+} from './configs/typeorm';
 import { AuthModule } from './infrastructure/auth/auth.module';
 import { ExchangesModule } from './infrastructure/exchanges/exchanges.module';
 import { BullServiceModule } from './infrastructure/services/bull/bull.module';
@@ -17,13 +21,20 @@ import { TelegramModule } from './infrastructure/services/telegram/telegram.modu
 import { SessionModule } from './infrastructure/session/session.module';
 import { SessionService } from './infrastructure/session/session.service';
 import { TradingBotModule } from './infrastructure/trading-bots/trading-bots.module';
+import { TradingServicesModule } from './infrastructure/trading-services/trading-services.module';
 
 @Module({
 	imports: [
 		TypeOrmModule.forRootAsync({
 			imports: [],
 			inject: [],
-			useFactory: getTypeOrmModuleOptions,
+			useFactory: getMainOrmOptions,
+		}),
+		TypeOrmModule.forRootAsync({
+			imports: [],
+			inject: [],
+			name: DATABASES.SERVICE_DB,
+			useFactory: getServiceOrmOptions,
 		}),
 		ConfigModule.forRoot(getConfigModuleOptions()),
 		ScheduleModule.forRoot(),
@@ -37,14 +48,15 @@ import { TradingBotModule } from './infrastructure/trading-bots/trading-bots.mod
 		}),
 		SessionModule,
 		BullServiceModule,
-		
+		TradingServicesModule,
+
 		AuthModule,
-		
+
 		ExchangesModule,
 		TradingBotModule,
-		
+
 		CustomLoggerModule,
-		
+
 		TelegramModule,
 		BackgroundModule,
 	],

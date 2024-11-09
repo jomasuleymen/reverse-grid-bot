@@ -13,7 +13,6 @@ export class TradingBotOrdersService {
 	async findByBotId(botId: number) {
 		return await this.botOrdersRepo.find({
 			where: { botId: Equal(botId) },
-			order: { id: 'DESC' },
 		});
 	}
 

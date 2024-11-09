@@ -131,6 +131,8 @@ export class TradingBotStartConsumer extends WorkerHost {
 					- Покупная цена: ${order.avgPrice}
 					
 					💰 **Доходность**
+					- Прибыль: ${pnl.totalProfit.toFixed(2)}
+					- Комиссия: ${pnl.fee.toFixed(2)}
 					- Реализованная прибыль: ${pnl.realizedPnL.toFixed(2)}
 					- Нереализованная прибыль: ${pnl.unrealizedPnL.toFixed(2)}
 					- Прибыль: ${pnl.PnL.toFixed(2)}

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Col, Form, FormItemProps, Modal, Row, Space } from 'antd'
+import { Button, Col, Form, FormItemProps, Modal, Row, Space } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
+import ErrorDisplay from './ErrorDisplay'
 
 interface UpsertModalFormProps<TFormData, TResponse, TError> {
   validate?: (formData: TFormData) => string | string[] | null | undefined
@@ -111,19 +112,7 @@ function UpsertModalForm<TFormData extends Record<string, any>, TResponse, TErro
               ),
             )}
 
-            {errors && (
-              <Alert
-                message={
-                  <ul>
-                    {errors.map((error, idx) => (
-                      <li key={idx}>{error}</li>
-                    ))}
-                  </ul>
-                }
-                type={'error'}
-                style={{ marginBottom: '20px' }}
-              />
-            )}
+            {errors && <ErrorDisplay className="mb-2" error={error as any} />}
             <Row align="middle" justify="end" gutter={[10, 10]}>
               <Col>
                 <Form.Item>

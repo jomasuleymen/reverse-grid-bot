@@ -90,13 +90,14 @@ export interface IStartBotOptions {
 
 export interface IBotSummary {
   pnl: {
+    totalProfit: number
+    fee: number
     realizedPnL: number
     unrealizedPnL: number
     PnL: number
   }
   buyCount: number
   sellCount: number
-  sumComission: number
 }
 
 export const TRADING_BOT_API = {

@@ -1,8 +1,9 @@
+import ErrorDisplay from '@/components/ErrorDisplay'
 import { MessageResponse } from '@/services/auth.service'
 import { useAuthStore } from '@/store/auth.store'
 import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { useMutation } from '@tanstack/react-query'
-import { Alert, Button, Card, Form, Input } from 'antd'
+import { Button, Card, Form, Input } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -66,9 +67,7 @@ const Login: React.FC<LoginProps> = () => {
             />
           </Form.Item>
 
-          {!isPending && isError && (
-            <Alert message={error?.message} type={'error'} style={{ fontSize: '12px' }} />
-          )}
+          {!isPending && isError && <ErrorDisplay className="mb-2" error={error as any} />}
 
           <Form.Item className="m-0">
             <Button type="primary" htmlType="submit" className="w-full" loading={isPending}>

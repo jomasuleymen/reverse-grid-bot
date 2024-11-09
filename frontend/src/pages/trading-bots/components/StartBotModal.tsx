@@ -1,4 +1,5 @@
 import Block from '@/components/Block/Block'
+import ErrorDisplay from '@/components/ErrorDisplay'
 import { TRADING_BOT_CONFIGS_QUERY_KEY } from '@/pages/bot-configs'
 import { BotConfigFormItems } from '@/pages/bot-configs/BotConfigsTopBar'
 import { TRADING_BOT_CREDENTIALS_QUERY_KEY } from '@/pages/exchange-credentials'
@@ -6,7 +7,7 @@ import { SERVICES } from '@/services'
 import { ExchangeCredentials } from '@/services/exchanges.service'
 import { IStartBotOptions, TradingBotConfig } from '@/services/trading-bot.service'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Col, Form, FormItemProps, Modal, Row, Select, Space } from 'antd'
+import { Button, Col, Form, FormItemProps, Modal, Row, Select, Space } from 'antd'
 import React, { useState } from 'react'
 import { TRADING_BOTS_QUERY_KEY } from '..'
 
@@ -149,17 +150,7 @@ const StartBotModal: React.FC = () => {
             ),
           )}
 
-          {isError && (
-            <Alert
-              message={
-                <ul>
-                  <li>{error.message}</li>
-                </ul>
-              }
-              type="error"
-              style={{ marginBottom: '20px' }}
-            />
-          )}
+          {isError && <ErrorDisplay className="mb-2" error={error as any} />}
 
           <Row justify="end" gutter={10}>
             <Col>

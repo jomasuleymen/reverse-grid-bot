@@ -22,16 +22,26 @@ export class AllExceptionFilter implements ExceptionFilter {
 				? exception.getStatus()
 				: HttpStatus.INTERNAL_SERVER_ERROR;
 
-		const message =
-			exception instanceof HttpException
-				? (exception.getResponse() as IError)
-				: { message: (exception as Error).message, code_error: null };
-
-		const responseData: { statusCode: number; message: any } = {
+		let responseData: Record<string, any> = {
 			statusCode: status,
-			message: null,
+			message: exception?.message,
 		};
-		responseData.message = message.message || message;
+
+		if (exception instanceof HttpException) {
+			const exceptionResponse = exception.getResponse() as IError;
+
+			if (typeof exceptionResponse === 'object') {
+				responseData = {
+					...responseData,
+					...exceptionResponse,
+				};
+			} else {
+				responseData = {
+					...responseData,
+					message: exceptionResponse,
+				};
+			}
+		}
 
 		response.status(status).json(responseData);
 	}

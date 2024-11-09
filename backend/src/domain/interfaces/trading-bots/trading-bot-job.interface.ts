@@ -1,4 +1,3 @@
-import { ITradingBotConfig } from './trading-bot.interface.interface';
 
 export interface IStartTradingBotQueueData {
 	botId: number;
@@ -6,4 +5,8 @@ export interface IStartTradingBotQueueData {
 
 export interface IStopTradingBotQueueData {
 	botId: number;
+}
+
+export interface IReverseGridBotSimulateQueueData {
+	configId: number;
 }

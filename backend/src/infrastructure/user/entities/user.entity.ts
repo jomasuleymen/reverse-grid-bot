@@ -1,15 +1,15 @@
 import { ExchangeCredentialsEntity } from '@/infrastructure/exchanges/exchange-credentials/entites/exchange-credentials.entity';
 import { TelegramAccountEntity } from '@/infrastructure/notification/entities/telegram-account.entity';
+import { TradingBotEntity } from '@/infrastructure/trading-bots/entities/trading-bots.entity';
 import { Exclude } from 'class-transformer';
 import {
 	Column,
 	Entity,
 	OneToMany,
 	OneToOne,
-	PrimaryGeneratedColumn,
+	PrimaryGeneratedColumn
 } from 'typeorm';
 import { TradingBotConfigEntity } from '../../trading-bots/configurations/entities/trading-config.entity';
-import { TradingBotEntity } from '@/infrastructure/trading-bots/entities/trading-bots.entity';
 
 @Entity('user')
 export class UserEntity {

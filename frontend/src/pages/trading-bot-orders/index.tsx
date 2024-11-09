@@ -1,7 +1,8 @@
+import ErrorDisplay from '@/components/ErrorDisplay'
 import { SERVICES } from '@/services'
 import { useQuery } from '@tanstack/react-query'
-import { Alert, message, Space, Spin } from 'antd'
-import React, { useEffect } from 'react'
+import { Space, Spin } from 'antd'
+import React from 'react'
 import { useParams } from 'react-router'
 import TradingBotOrdersInfo from './TradingBotOrdersInfo'
 import TradingBotOrdersTable from './TradingBotOrdersTable'
@@ -17,12 +18,6 @@ const TradingBotOrders: React.FC<Props> = ({}) => {
     refetchOnWindowFocus: false,
   })
 
-  useEffect(() => {
-    if (isError && error) {
-      message.error(error.message)
-    }
-  }, [error, isError])
-
   return (
     <Spin tip="Загрузка..." spinning={isPending}>
       {!isPending && isSuccess && (
@@ -34,7 +29,7 @@ const TradingBotOrders: React.FC<Props> = ({}) => {
           />
         </Space>
       )}
-      {!isPending && isError && <Alert message={error.message} type="error" />}
+      {!isPending && isError && <ErrorDisplay className="mb-2" error={error as any} />}
     </Spin>
   )
 }

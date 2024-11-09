@@ -100,7 +100,7 @@ const getDescriptionItems = (
   config: Props['configs'],
 ): DescriptionsProps['items'] => [
   {
-    label: 'Прибыль',
+    label: 'PnL',
     children: (
       <span>
         {data.pnl.PnL.toFixed(6)} {config.quoteCurrency}
@@ -108,7 +108,7 @@ const getDescriptionItems = (
     ),
   },
   {
-    label: 'Нереализованная прибыль',
+    label: 'Unrealized PnL',
     children: (
       <span>
         {data.pnl.unrealizedPnL.toFixed(6)} {config.quoteCurrency}
@@ -116,7 +116,7 @@ const getDescriptionItems = (
     ),
   },
   {
-    label: 'Реализованная прибыль',
+    label: 'Realized PnL',
     children: (
       <span>
         {data.pnl.realizedPnL.toFixed(6)} {config.quoteCurrency}
@@ -127,7 +127,7 @@ const getDescriptionItems = (
     label: 'Сумма комиссии',
     children: (
       <span>
-        {data.sumComission.toFixed(6)} {config.quoteCurrency}
+        {data.pnl.fee.toFixed(6)} {config.quoteCurrency}
       </span>
     ),
     span: 3,
