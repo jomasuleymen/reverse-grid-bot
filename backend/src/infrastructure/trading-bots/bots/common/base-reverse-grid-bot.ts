@@ -7,6 +7,7 @@ import {
 	ITradingBot,
 	ITradingBotConfig,
 	OrderCreationType,
+	TradePosition,
 	TradingBotOrder,
 	TradingBotSnapshot,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
@@ -57,6 +58,9 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		minPrice: 100_000_000,
 	};
 
+	private TRIGGER_SIDE: OrderSide = OrderSide.BUY;
+	private STOP_LOSS_SIDE: OrderSide = OrderSide.SELL;
+
 	// Processes state
 	private isCheckingLastPrice: boolean = false;
 	private isMadeFirstOrder: boolean = false;
@@ -71,6 +75,12 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			options.config.baseCurrency,
 			options.config.quoteCurrency,
 		);
+
+		if (this.config.position === TradePosition.SHORT) {
+			this.TRIGGER_SIDE = OrderSide.SELL;
+			this.STOP_LOSS_SIDE = OrderSide.BUY;
+			this.config.gridStep *= -1;
+		}
 
 		await this.postSetConfiguration();
 
@@ -231,7 +241,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		) {
 			const newOrders: CreateTradingBotOrder[] = [];
 
-			if (order.side === OrderSide.BUY) {
+			if (order.side === this.TRIGGER_SIDE) {
 				newOrders.push({
 					type: 'stop-loss',
 					triggerPrice: triggerPrice - this.config.gridStep,
@@ -240,38 +250,33 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 						OrderCreationType.STOP_LOSS,
 						triggerPrice - this.config.gridStep,
 					),
-					side: OrderSide.SELL,
+					side: this.STOP_LOSS_SIDE,
 					symbol: this.symbol,
 				});
 
-				let maxTriggerPrice =
-					triggerPrice +
-					this.config.gridStep * this.gridConfig.atLeastBuyCount;
-
-				while (this.triggerPrices.maxPrice < maxTriggerPrice) {
-					const newTriggerPrice =
-						this.triggerPrices.maxPrice + this.config.gridStep;
+				while (this.shouldCreateNextTrigger(triggerPrice)) {
+					const nextTriggerPrice = this.getNextTriggerPrice();
 
 					newOrders.push({
 						type: 'stop-order',
-						side: OrderSide.BUY,
-						triggerPrice: newTriggerPrice,
+						side: this.TRIGGER_SIDE,
+						triggerPrice: nextTriggerPrice,
 						quantity: order.quantity,
 						customId: this.getCustomOrderId(
 							OrderCreationType.TRIGGER,
-							newTriggerPrice,
+							nextTriggerPrice,
 						),
 						symbol: this.symbol,
 					});
 
-					this.updateTriggerPrices(newTriggerPrice);
+					this.updateTriggerPrices(nextTriggerPrice);
 				}
 			} else {
 				const newTriggerPrice = triggerPrice + this.config.gridStep;
 
 				newOrders.push({
 					type: 'stop-order',
-					side: OrderSide.BUY,
+					side: this.TRIGGER_SIDE,
 					triggerPrice: newTriggerPrice,
 					quantity: order.quantity,
 					customId: this.getCustomOrderId(
@@ -291,6 +296,49 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		this.callBacks.onNewOrder(order, triggerPrice, this.orders);
 	}
 
+	private shouldCreateNextTrigger(triggerPrice: number): boolean {
+		let triggerPriceEdge =
+			triggerPrice +
+			this.config.gridStep * this.gridConfig.atLeastBuyCount;
+
+		if (this.config.position === TradePosition.SHORT) {
+			return this.triggerPrices.minPrice > triggerPriceEdge;
+		}
+
+		return this.triggerPrices.maxPrice < triggerPriceEdge;
+	}
+
+	private getNextTriggerPrice() {
+		let edgePrice =
+			this.config.position === TradePosition.SHORT
+				? this.triggerPrices.minPrice
+				: this.triggerPrices.maxPrice;
+
+		return edgePrice + this.config.gridStep;
+	}
+
+	private shouldCreateMissedTrigger(lastPrice: number): boolean {
+		if (this.config.position === TradePosition.SHORT) {
+			return (
+				lastPrice >=
+				this.triggerPrices.maxPrice - this.config.gridStep * 2
+			);
+		}
+
+		return (
+			this.triggerPrices.minPrice >= lastPrice + this.config.gridStep * 2
+		);
+	}
+
+	private getMissedTriggerPrice() {
+		let edgePrice =
+			this.config.position === TradePosition.SHORT
+				? this.triggerPrices.maxPrice
+				: this.triggerPrices.minPrice;
+
+		return edgePrice - this.config.gridStep;
+	}
+
 	protected updateLastPrice(lastPrice: number) {
 		this.marketData.lastPrice = lastPrice;
 		this.checkMissedTriggers(lastPrice);
@@ -302,26 +350,22 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		const orders: CreateTradingBotOrder[] = [];
 
-		while (
-			this.triggerPrices.minPrice >=
-			lastPrice + this.config.gridStep * 2
-		) {
-			const newTriggerPrice =
-				this.triggerPrices.minPrice - this.config.gridStep;
+		while (this.shouldCreateMissedTrigger(lastPrice)) {
+			const missedTriggerPrice = this.getMissedTriggerPrice();
 
 			orders.push({
-				side: OrderSide.BUY,
-				triggerPrice: newTriggerPrice,
+				side: this.TRIGGER_SIDE,
+				triggerPrice: missedTriggerPrice,
 				type: 'stop-order',
 				customId: this.getCustomOrderId(
 					OrderCreationType.TRIGGER,
-					newTriggerPrice,
+					missedTriggerPrice,
 				),
 				quantity: this.config.gridVolume,
 				symbol: this.symbol,
 			});
 
-			this.updateTriggerPrices(newTriggerPrice);
+			this.updateTriggerPrices(missedTriggerPrice);
 		}
 
 		if (orders.length) {
@@ -342,14 +386,14 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		);
 	}
 
-	private async closeAllPositions(maxPrice?: number) {
+	private async closeAllPositions(maxQuantity?: number) {
 		let allQuantity = 0;
 		for (const order of this.orders) {
-			if (order.side === OrderSide.BUY) allQuantity += order.quantity;
+			if (order.side === this.TRIGGER_SIDE) allQuantity += order.quantity;
 			else allQuantity -= order.quantity;
 		}
 
-		if (maxPrice && allQuantity > maxPrice) allQuantity = maxPrice;
+		if (maxQuantity && allQuantity > maxQuantity) allQuantity = maxQuantity;
 
 		if (allQuantity > 0) {
 			await this.submitOrder({
@@ -358,7 +402,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 					0,
 				),
 				quantity: allQuantity,
-				side: OrderSide.SELL,
+				side: this.STOP_LOSS_SIDE,
 				symbol: this.symbol,
 				type: 'order',
 			});
@@ -385,7 +429,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			this.updateState(BotState.Running);
 
 			await this.submitOrder({
-				side: OrderSide.BUY,
+				side: this.TRIGGER_SIDE,
 				customId: this.getCustomOrderId(
 					OrderCreationType.FIRST_TRADE,
 					startPrice,
@@ -456,8 +500,10 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	protected async createSnapshot(): Promise<TradingBotSnapshot> {
-		const currentPrice = await this.getTickerLastPrice(this.symbol);
-		const walletBalance = await this.getWalletBalance();
+		const [currentPrice, walletBalance] = await Promise.all([
+			this.getTickerLastPrice(this.symbol),
+			this.getWalletBalance(),
+		]);
 
 		return {
 			currentPrice: currentPrice,
@@ -468,7 +514,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 	private getStopLossCount() {
 		let buyCount = this.orders.filter(
-			(order) => order.side === OrderSide.BUY,
+			(order) => order.side === this.TRIGGER_SIDE,
 		).length;
 
 		let sellCount = this.orders.length - buyCount;

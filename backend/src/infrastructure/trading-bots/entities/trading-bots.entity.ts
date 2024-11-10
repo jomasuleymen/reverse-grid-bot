@@ -2,6 +2,7 @@ import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
 import {
 	BotState,
 	ExchangeCredentialsType,
+	TradePosition,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { ExchangeCredentialsEntity } from '@/infrastructure/exchanges/exchange-credentials/entites/exchange-credentials.entity';
 import { UserEntity } from '@/infrastructure/user/entities/user.entity';
@@ -45,6 +46,9 @@ export class TradingBotEntity {
 
 	@Column({ type: 'real' })
 	gridVolume: number;
+
+	@Column({ type: 'integer', default: TradePosition.LONG })
+	position: TradePosition;
 
 	@Column({ type: 'integer', default: BotState.Idle })
 	state: BotState;

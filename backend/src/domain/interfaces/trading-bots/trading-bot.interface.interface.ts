@@ -40,12 +40,18 @@ export enum ExchangeCredentialsType {
 	Real = 'Real',
 }
 
+export enum TradePosition {
+	LONG = 1,
+	SHORT = 2,
+}
+
 export interface ITradingBotConfig {
 	baseCurrency: string;
 	quoteCurrency: string;
 	takeProfitOnGrid: number;
 	gridStep: number;
 	gridVolume: number;
+	position: TradePosition;
 }
 
 export interface IExchangeCredentials {
