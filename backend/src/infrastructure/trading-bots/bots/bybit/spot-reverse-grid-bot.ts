@@ -179,13 +179,13 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		const params: OrderParamsV5 = {
 			category: 'spot',
 			side: order.side === OrderSide.BUY ? 'Buy' : 'Sell',
-			qty: order.quantity.toFixed(6).toString(),
+			qty: order.quantity.toString(),
 			orderLinkId: order.customId,
 			symbol: order.symbol,
 			orderType: 'Market',
 			marketUnit: 'baseCoin',
 			timeInForce: 'GTC',
-			isLeverage: order.side === OrderSide.BUY ? 1 : 0,
+			isLeverage: 1,
 		};
 
 		if (order.type === 'order') {

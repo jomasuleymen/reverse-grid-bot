@@ -40,12 +40,13 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 	private callBacks: IStartReverseBotOptions['callBacks'];
 
-	private readonly minBaseWalletUsdValue = 10;
+	private readonly minCoinBalance = 10;
 	private readonly requestConfig = {
 		defaultAttempts: 2,
 	};
 	private readonly marketData = {
 		lastPrice: 0,
+		
 	};
 	private readonly gridConfig = {
 		atLeastBuyCount: 2,
@@ -83,19 +84,17 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		const snapshot = await this.createSnapshot();
 
-		const coinBalance = snapshot.walletBalance.coins.find(
-			(coin) => coin.coin === this.config.baseCurrency,
+		this.validateCoinBalance(
+			snapshot.walletBalance,
+			this.config.baseCurrency,
+			this.minCoinBalance,
 		);
 
-		if (!coinBalance)
-			throw new BadRequestException(
-				`${this.config.baseCurrency} кошелека не найден`,
-			);
-
-		if (coinBalance.usdValue < this.minBaseWalletUsdValue)
-			throw new BadRequestException(
-				`В кошелке ${this.config.baseCurrency} меньше ${this.minBaseWalletUsdValue} USD`,
-			);
+		this.validateCoinBalance(
+			snapshot.walletBalance,
+			this.config.quoteCurrency,
+			this.minCoinBalance,
+		);
 
 		this.snapshots.start = snapshot;
 
@@ -106,6 +105,24 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			() => this.checkBotState(),
 			1000,
 		);
+	}
+
+	private validateCoinBalance(
+		walletBalance: WalletBalance,
+		currency: string,
+		minBalance: number,
+	) {
+		const coinBalance = walletBalance.coins.find(
+			(coin) => coin.coin === currency,
+		);
+
+		if (!coinBalance)
+			throw new BadRequestException(`${currency} кошелека не найден`);
+
+		if (coinBalance.usdValue < minBalance)
+			throw new BadRequestException(
+				`В кошелке ${currency} меньше ${minBalance} USD`,
+			);
 	}
 
 	public async stop(): Promise<void> {
@@ -127,7 +144,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 			await this.callWithRetry(() => this.cancelAllOrders());
 			this.callWithRetry(() =>
-				this.sellAllBoughtCurrencies(foundBaseCoin?.balance),
+				this.closeAllPositions(foundBaseCoin?.balance),
 			)
 				.catch((err) => {
 					this.logger.error(
@@ -189,12 +206,12 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				: Number(order.fee) * Number(order.avgPrice);
 		order.feeCurrency = this.config.quoteCurrency.toUpperCase();
 
-		if (prefix === OrderCreationType.SELL_ALL) this.cleanUp();
+		if (prefix === OrderCreationType.LAST_TRADE) this.cleanUp();
 		else if (this.state !== BotState.Running) return;
 		else if (
-			prefix === OrderCreationType.BUY_TRIGGER ||
+			prefix === OrderCreationType.TRIGGER ||
 			prefix === OrderCreationType.STOP_LOSS ||
-			prefix === OrderCreationType.FIRST_BUY
+			prefix === OrderCreationType.FIRST_TRADE
 		) {
 			const newOrders: CreateTradingBotOrder[] = [];
 
@@ -225,7 +242,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 						triggerPrice: newTriggerPrice,
 						quantity: order.quantity,
 						customId: this.getCustomOrderId(
-							OrderCreationType.BUY_TRIGGER,
+							OrderCreationType.TRIGGER,
 							newTriggerPrice,
 						),
 						symbol: this.symbol,
@@ -242,7 +259,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 					triggerPrice: newTriggerPrice,
 					quantity: order.quantity,
 					customId: this.getCustomOrderId(
-						OrderCreationType.BUY_TRIGGER,
+						OrderCreationType.TRIGGER,
 						newTriggerPrice,
 					),
 					symbol: this.symbol,
@@ -260,10 +277,10 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 	protected updateLastPrice(lastPrice: number) {
 		this.marketData.lastPrice = lastPrice;
-		this.checkAndCreateBuyOrders(lastPrice);
+		this.checkMissedTriggers(lastPrice);
 	}
 
-	private async checkAndCreateBuyOrders(lastPrice: number) {
+	private async checkMissedTriggers(lastPrice: number) {
 		if (this.isCheckingLastPrice || this.state !== BotState.Running) return;
 		this.isCheckingLastPrice = true;
 
@@ -281,7 +298,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				triggerPrice: newTriggerPrice,
 				type: 'stop-order',
 				customId: this.getCustomOrderId(
-					OrderCreationType.BUY_TRIGGER,
+					OrderCreationType.TRIGGER,
 					newTriggerPrice,
 				),
 				quantity: this.config.gridVolume,
@@ -309,7 +326,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		);
 	}
 
-	private async sellAllBoughtCurrencies(maxPrice?: number) {
+	private async closeAllPositions(maxPrice?: number) {
 		let allQuantity = 0;
 		for (const order of this.orders) {
 			if (order.side === OrderSide.BUY) allQuantity += order.quantity;
@@ -320,7 +337,10 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		if (allQuantity > 0) {
 			await this.submitOrder({
-				customId: this.getCustomOrderId(OrderCreationType.SELL_ALL, 0),
+				customId: this.getCustomOrderId(
+					OrderCreationType.LAST_TRADE,
+					0,
+				),
 				quantity: allQuantity,
 				side: OrderSide.SELL,
 				symbol: this.symbol,
@@ -331,7 +351,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 	protected addNewOrder(order: TradingBotOrder) {
 		this.orders.push(order);
-		const buyOrdersInSeries = this.getBoughtCountInSeries();
+		const buyOrdersInSeries = this.getStopLossCount();
 		if (this.config.takeProfitOnGrid <= buyOrdersInSeries) {
 			this.stop();
 		}
@@ -351,7 +371,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			await this.submitOrder({
 				side: OrderSide.BUY,
 				customId: this.getCustomOrderId(
-					OrderCreationType.FIRST_BUY,
+					OrderCreationType.FIRST_TRADE,
 					startPrice,
 				),
 				type: 'order',
@@ -422,7 +442,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		};
 	}
 
-	private getBoughtCountInSeries() {
+	private getStopLossCount() {
 		let buyCount = this.orders.filter(
 			(order) => order.side === OrderSide.BUY,
 		).length;
