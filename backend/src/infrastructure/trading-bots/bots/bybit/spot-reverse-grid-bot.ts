@@ -185,7 +185,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			orderType: 'Market',
 			marketUnit: 'baseCoin',
 			timeInForce: 'GTC',
-			isLeverage: order.side === OrderSide.BUY ? 1 : 0,
+			isLeverage: 1,
 		};
 
 		if (order.type === 'order') {
