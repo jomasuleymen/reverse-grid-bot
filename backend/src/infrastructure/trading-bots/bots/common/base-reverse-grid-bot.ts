@@ -451,6 +451,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				await callback();
 				return { success: true };
 			} catch (error) {
+				this.logger.error(
+					`Error callWithRetry, attempts left: ${attempts - 1}`,
+					error,
+				);
+				
 				attempts -= 1;
 				if (attempts === 0) {
 					return { success: false, message: error };
