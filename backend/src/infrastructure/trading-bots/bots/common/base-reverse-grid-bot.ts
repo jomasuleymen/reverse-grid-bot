@@ -109,7 +109,6 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		await this.init();
 
-		this.callBacks.onStateUpdate(BotState.Running, this);
 		this.checkBotStateTimer = setIntervalAsync(
 			() => this.checkBotState(),
 			1000,
@@ -239,6 +238,13 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			prefix === OrderCreationType.STOP_LOSS ||
 			prefix === OrderCreationType.FIRST_TRADE
 		) {
+			if (
+				prefix === OrderCreationType.TRIGGER &&
+				this.state !== BotState.Running
+			) {
+				this.callBacks.onStateUpdate(BotState.Running, this);
+			}
+
 			const newOrders: CreateTradingBotOrder[] = [];
 
 			if (order.side === this.TRIGGER_SIDE) {
@@ -437,6 +443,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				type: 'order',
 				quantity: this.config.gridVolume,
 				symbol: this.symbol,
+			}).then((res) => {
+				if (res.success) {
+				} else {
+					this.stop();
+				}
 			});
 		} catch (err) {
 			this.logger.error('ERROR while makeFirstOrders', err);
@@ -450,15 +461,10 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			try {
 				await callback();
 				return { success: true };
-			} catch (error) {
-				this.logger.error(
-					`Error callWithRetry, attempts left: ${attempts - 1}`,
-					error,
-				);
-				
+			} catch (error: any) {
 				attempts -= 1;
 				if (attempts === 0) {
-					return { success: false, message: error };
+					return { success: false, message: error?.message };
 				}
 
 				await sleep(500); // delay before retry
@@ -490,18 +496,20 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	private async submitOrder(order: CreateTradingBotOrder) {
 		const rawOrder = this.getCreateOrderParams(order);
 
-		await this.retryWithFallback(() => this.submitOrderImpl(rawOrder)).then(
-			(res) => {
-				if (res.success) {
-					this.logger.info('Order placed successfully', order);
-				} else {
-					this.logger.error(`Order can't placed`, {
-						order,
-						message: res.message,
-					});
-				}
-			},
-		);
+		return await this.retryWithFallback(() =>
+			this.submitOrderImpl(rawOrder),
+		).then((res) => {
+			if (res.success) {
+				this.logger.info('Order placed successfully', order);
+			} else {
+				this.logger.error(`Order can't placed`, {
+					order,
+					message: res.message,
+				});
+			}
+
+			return res;
+		});
 	}
 
 	protected async createSnapshot(): Promise<TradingBotSnapshot> {

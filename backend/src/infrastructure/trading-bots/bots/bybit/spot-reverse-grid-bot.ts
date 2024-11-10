@@ -218,8 +218,6 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 
 	protected async submitOrderImpl(orderParams: OrderParamsV5): Promise<void> {
 		const response = await this.restClient.submitOrder(orderParams);
-		
-		this.logger.info('submitOrderImpl response', response);
 		if (response.retCode === 0) {
 			return;
 		} else {
@@ -235,7 +233,6 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			ordersParams,
 		);
 
-		this.logger.info('submitManyOrdersImpl response', response);
 		if (response.retCode === 0) {
 		} else {
 			throw new Error(response.retMsg);
