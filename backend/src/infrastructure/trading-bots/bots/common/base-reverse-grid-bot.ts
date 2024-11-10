@@ -13,13 +13,13 @@ import {
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
+import { retryWithFallback } from '@/infrastructure/utils/request.utils';
 import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common';
 import {
 	clearIntervalAsync,
 	setIntervalAsync,
 	SetIntervalAsyncTimer,
 } from 'set-interval-async';
-import sleep from 'sleep-promise';
 
 type TradingBotState = BotState.Idle | BotState.Running | BotState.Stopped;
 
@@ -144,25 +144,25 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				clearIntervalAsync(this.checkBotStateTimer);
 			}
 
+			await retryWithFallback(() => this.cancelAllOrders()).then(
+				(res) => {
+					if (res.success) {
+						this.logger.info('Successfully cancelled all orders');
+					} else {
+						this.logger.error(`Can't cancell orders`, {
+							error: res.error,
+						});
+					}
+				},
+			);
+
 			this.snapshots.end = await this.createSnapshot();
 
 			const foundBaseCoin = this.snapshots.end.walletBalance.coins.find(
 				(coin) => coin.coin === this.config.baseCurrency,
 			);
 
-			await this.retryWithFallback(() => this.cancelAllOrders()).then(
-				(res) => {
-					if (res.success) {
-						this.logger.info('Successfully cancelled all orders');
-					} else {
-						this.logger.error(`Can't cancell orders`, {
-							message: res.message,
-						});
-					}
-				},
-			);
-
-			this.retryWithFallback(() =>
+			retryWithFallback(() =>
 				this.closeAllPositions(foundBaseCoin?.balance),
 			)
 				.then((res) => {
@@ -172,7 +172,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 						this.logger.error(
 							'Error while sellong bought currencies',
 							{
-								message: res.message,
+								error: res.error,
 							},
 						);
 					}
@@ -238,10 +238,6 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			prefix === OrderCreationType.STOP_LOSS ||
 			prefix === OrderCreationType.FIRST_TRADE
 		) {
-			if (prefix === OrderCreationType.FIRST_TRADE) {
-				this.callBacks.onStateUpdate(BotState.Running, this);
-			}
-
 			const newOrders: CreateTradingBotOrder[] = [];
 
 			if (order.side === this.TRIGGER_SIDE) {
@@ -442,6 +438,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				symbol: this.symbol,
 			}).then((res) => {
 				if (res.success) {
+					this.callBacks.onStateUpdate(BotState.Running, this);
 				} else {
 					this.stop();
 				}
@@ -450,33 +447,13 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			this.logger.error('ERROR while makeFirstOrders', err);
 		}
 	}
-	private async retryWithFallback(
-		callback: () => Promise<void>,
-		attempts = this.requestConfig.defaultAttempts,
-	): Promise<{ success: boolean; message?: any }> {
-		while (attempts > 0) {
-			try {
-				await callback();
-				return { success: true };
-			} catch (error: any) {
-				attempts -= 1;
-				if (attempts === 0) {
-					return { success: false, message: error?.message };
-				}
-
-				await sleep(500); // delay before retry
-			}
-		}
-
-		return { success: false };
-	}
 
 	private async submitManyOrders(orders: CreateTradingBotOrder[]) {
 		if (orders.length === 0) return;
 
 		const rawOrders = orders.map(this.getCreateOrderParams);
 
-		await this.retryWithFallback(() =>
+		await retryWithFallback(() =>
 			this.submitManyOrdersImpl(rawOrders),
 		).then((res) => {
 			if (res.success) {
@@ -484,7 +461,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			} else {
 				this.logger.error(`Orders can't placed`, {
 					orders,
-					message: res.message,
+					error: res.error,
 				});
 			}
 		});
@@ -493,7 +470,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	private async submitOrder(order: CreateTradingBotOrder) {
 		const rawOrder = this.getCreateOrderParams(order);
 
-		return await this.retryWithFallback(() =>
+		return await retryWithFallback(() =>
 			this.submitOrderImpl(rawOrder),
 		).then((res) => {
 			if (res.success) {
@@ -501,7 +478,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			} else {
 				this.logger.error(`Order can't placed`, {
 					order,
-					message: res.message,
+					error: res.error,
 				});
 			}
 

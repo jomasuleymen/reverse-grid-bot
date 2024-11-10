@@ -6,6 +6,7 @@ import {
 } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
 import { BybitService } from '@/infrastructure/exchanges/modules/bybit/bybit.service';
+import { retryWithFallback } from '@/infrastructure/utils/request.utils';
 import { Injectable, Scope } from '@nestjs/common';
 import {
 	BatchOrderParamsV5,
@@ -149,28 +150,50 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	}
 
 	protected async getWalletBalance(): Promise<WalletBalance> {
-		const walletBalanceRes = await this.restClient.getWalletBalance({
-			accountType: this.accountType,
-		});
-
-		const accountBalance = walletBalanceRes.result.list.find(
-			(wallet) => wallet.accountType === this.accountType,
+		const walletBalanceRes = await retryWithFallback(
+			() =>
+				this.restClient.getWalletBalance({
+					accountType: this.accountType,
+				}),
+			{
+				attempts: 4,
+				delay: 500,
+				checkIfSuccess(res) {
+					return {
+						success: res.retCode === 0,
+						message: res.retMsg,
+					};
+				},
+			},
 		);
 
-		if (!accountBalance)
-			throw new Error(`Счёт ${this.accountType} не найден`);
+		if (walletBalanceRes.success && walletBalanceRes.data.result?.list) {
+			const accountBalance = walletBalanceRes.data.result.list.find(
+				(wallet) => wallet.accountType === this.accountType,
+			);
 
-		const walletBalance: WalletBalance = {
-			accountType: accountBalance.accountType,
-			balanceInUsd: Number(accountBalance.totalWalletBalance),
-			coins: accountBalance.coin.map((coin) => ({
-				coin: coin.coin,
-				balance: Number(coin.walletBalance),
-				usdValue: Number(coin.usdValue),
-			})),
-		};
+			if (!accountBalance)
+				throw new Error(`Счёт ${this.accountType} не найден`);
 
-		return walletBalance;
+			const walletBalance: WalletBalance = {
+				accountType: accountBalance.accountType,
+				balanceInUsd: Number(accountBalance.totalWalletBalance),
+				coins: accountBalance.coin.map((coin) => ({
+					coin: coin.coin,
+					balance: Number(coin.walletBalance),
+					usdValue: Number(coin.usdValue),
+				})),
+			};
+
+			return walletBalance;
+		} else {
+			this.logger.error('Can not fetch wallet balance', walletBalanceRes);
+			return {
+				accountType: this.accountType,
+				balanceInUsd: 0,
+				coins: [],
+			};
+		}
 	}
 
 	protected getCreateOrderParams(
