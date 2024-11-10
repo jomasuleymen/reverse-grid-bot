@@ -161,9 +161,4 @@ export class TradingBotStartConsumer extends WorkerHost {
 	async error(failedReason: unknown) {
 		this.loggerService.error('Failed starting trading bot', failedReason);
 	}
-
-	@OnWorkerEvent('completed')
-	async completed(job: Job<IStartTradingBotQueueData>) {
-		this.loggerService.info('Started new trading bot', job);
-	}
 }

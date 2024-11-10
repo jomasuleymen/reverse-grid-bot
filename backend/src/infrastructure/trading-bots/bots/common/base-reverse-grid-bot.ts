@@ -46,7 +46,6 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	};
 	private readonly marketData = {
 		lastPrice: 0,
-		
 	};
 	private readonly gridConfig = {
 		atLeastBuyCount: 2,
@@ -142,15 +141,32 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				(coin) => coin.coin === this.config.baseCurrency,
 			);
 
-			await this.callWithRetry(() => this.cancelAllOrders());
-			this.callWithRetry(() =>
+			await this.retryWithFallback(() => this.cancelAllOrders()).then(
+				(res) => {
+					if (res.success) {
+						this.logger.info('Successfully cancelled all orders');
+					} else {
+						this.logger.error(`Can't cancell orders`, {
+							message: res.message,
+						});
+					}
+				},
+			);
+
+			this.retryWithFallback(() =>
 				this.closeAllPositions(foundBaseCoin?.balance),
 			)
-				.catch((err) => {
-					this.logger.error(
-						'Error while sellong bought currencies',
-						err,
-					);
+				.then((res) => {
+					if (res.success) {
+						this.logger.info('Successfully closed all positions');
+					} else {
+						this.logger.error(
+							'Error while sellong bought currencies',
+							{
+								message: res.message,
+							},
+						);
+					}
 				})
 				.finally(() => {
 					this.callBacks.onStateUpdate(BotState.Stopped, this);
@@ -382,27 +398,25 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			this.logger.error('ERROR while makeFirstOrders', err);
 		}
 	}
-	private async callWithRetry(
+	private async retryWithFallback(
 		callback: () => Promise<void>,
 		attempts = this.requestConfig.defaultAttempts,
-	): Promise<boolean> {
+	): Promise<{ success: boolean; message?: any }> {
 		while (attempts > 0) {
 			try {
 				await callback();
-				return true;
+				return { success: true };
 			} catch (error) {
-				this.logger.error(
-					`Error callWithRetry, attempts left: ${attempts - 1}`,
-					error,
-				);
 				attempts -= 1;
-				if (attempts === 0) return false;
+				if (attempts === 0) {
+					return { success: false, message: error };
+				}
 
-				await sleep(1000); // delay before retry
+				await sleep(500); // delay before retry
 			}
 		}
 
-		return false;
+		return { success: false };
 	}
 
 	private async submitManyOrders(orders: CreateTradingBotOrder[]) {
@@ -410,11 +424,16 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		const rawOrders = orders.map(this.getCreateOrderParams);
 
-		await this.callWithRetry(() =>
+		await this.retryWithFallback(() =>
 			this.submitManyOrdersImpl(rawOrders),
 		).then((res) => {
-			if (res) {
+			if (res.success) {
 				this.logger.info('Orders placed successfully', orders);
+			} else {
+				this.logger.error(`Orders can't placed`, {
+					orders,
+					message: res.message,
+				});
 			}
 		});
 	}
@@ -422,10 +441,15 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	private async submitOrder(order: CreateTradingBotOrder) {
 		const rawOrder = this.getCreateOrderParams(order);
 
-		await this.callWithRetry(() => this.submitOrderImpl(rawOrder)).then(
+		await this.retryWithFallback(() => this.submitOrderImpl(rawOrder)).then(
 			(res) => {
-				if (res) {
+				if (res.success) {
 					this.logger.info('Order placed successfully', order);
+				} else {
+					this.logger.error(`Order can't placed`, {
+						order,
+						message: res.message,
+					});
 				}
 			},
 		);
