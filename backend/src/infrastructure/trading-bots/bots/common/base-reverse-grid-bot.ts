@@ -239,7 +239,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			prefix === OrderCreationType.FIRST_TRADE
 		) {
 			if (
-				prefix === OrderCreationType.TRIGGER &&
+				prefix === OrderCreationType.FIRST_TRADE &&
 				this.state !== BotState.Running
 			) {
 				this.callBacks.onStateUpdate(BotState.Running, this);
