@@ -52,6 +52,7 @@ export class TradingBotStartConsumer extends WorkerHost {
 					gridVolume: botEntity.gridVolume,
 					quoteCurrency: botEntity.quoteCurrency,
 					takeProfitOnGrid: botEntity.takeProfitOnGrid,
+					position: botEntity.position,
 				},
 				credentials,
 				callBacks: {

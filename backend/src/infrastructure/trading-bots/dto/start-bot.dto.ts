@@ -1,5 +1,6 @@
+import { TradePosition } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
 import { Transform } from 'class-transformer';
-import { IsNumber, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsString } from 'class-validator';
 
 export class StartBotDto {
 	@IsNumber()
@@ -29,4 +30,7 @@ export class StartBotDto {
 
 	@IsNumber()
 	gridVolume: number;
+
+	@IsEnum(TradePosition)
+	position: TradePosition;
 }

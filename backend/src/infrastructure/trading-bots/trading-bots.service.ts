@@ -56,7 +56,7 @@ export class TradingBotService {
 			]),
 		});
 
-		if (activeBot) throw new BadRequestException('У вас активный бот');
+		if (activeBot) throw new BadRequestException('У вас есть активный бот');
 
 		const botEntity = await this.save({
 			userId: userId,
@@ -68,6 +68,7 @@ export class TradingBotService {
 			takeProfitOnGrid: options.takeProfitOnGrid,
 			baseCurrency: options.baseCurrency,
 			quoteCurrency: options.quoteCurrency,
+			position: options.position,
 		});
 
 		await this.tradingBotStartQueue.add('start', {

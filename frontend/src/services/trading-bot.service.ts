@@ -5,6 +5,11 @@ const TRADING_BOT_ENDPOINT = '/trading-bots'
 const TRADING_BOT_CONFIGS_ENDPOINT = TRADING_BOT_ENDPOINT + '-configs'
 const TRADING_BOT_ORDERS_ENDPOINT = TRADING_BOT_ENDPOINT + '/orders'
 
+export enum TradePosition {
+  LONG = 1,
+  SHORT = 2,
+}
+
 export type TradingBotConfig = {
   id: number
   takeProfitOnGrid: number
@@ -15,6 +20,7 @@ export type TradingBotConfig = {
   createdAt: string
   stoppedAt: string
   stopReason?: string
+  position: TradePosition
 }
 
 export enum TradingBotState {
