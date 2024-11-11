@@ -54,7 +54,7 @@ type Props = {
   bot: TradingBot
 }
 
-const TradingBotOrdersInfo: React.FC<Props> = ({ bot }) => {
+const TradingBotInfo: React.FC<Props> = ({ bot }) => {
   return (
     <Block className="max-w-full p-6 bg-white shadow-md rounded-md">
       <Descriptions
@@ -69,4 +69,4 @@ const TradingBotOrdersInfo: React.FC<Props> = ({ bot }) => {
   )
 }
 
-export default memo(TradingBotOrdersInfo)
+export default memo(TradingBotInfo)

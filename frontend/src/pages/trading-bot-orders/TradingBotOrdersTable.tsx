@@ -183,6 +183,7 @@ const TradingBotOrdersTable: React.FC<Props> = ({ botId, configs }) => {
           queryKey={queryKey}
           parseDataSource={parseDataSource}
           columns={getColumns(configs)}
+          refetchOnWindowFocus={true}
         />
       </Space>
     </Block>

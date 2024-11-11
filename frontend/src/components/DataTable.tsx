@@ -29,7 +29,7 @@ function DataTable({
     queryFn: () => fetchData(),
     refetchOnWindowFocus: refetchOnWindowFocus || false,
     refetchInterval: (query): number | false | undefined => {
-      if (!shouldRefetch) return false
+      if (!shouldRefetch) return refetchInterval || false
 
       return shouldRefetch(query.state.data) ? refetchInterval : false
     },

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Space, Spin } from 'antd'
 import React from 'react'
 import { useParams } from 'react-router'
-import TradingBotOrdersInfo from './TradingBotOrdersInfo'
+import TradingBotInfo from './TradingBotInfo'
 import TradingBotOrdersTable from './TradingBotOrdersTable'
 
 type Props = {}
@@ -22,7 +22,7 @@ const TradingBotOrders: React.FC<Props> = ({}) => {
     <Spin tip="Загрузка..." spinning={isPending}>
       {!isPending && isSuccess && (
         <Space direction="vertical" style={{ display: 'flex' }} className="px-4">
-          <TradingBotOrdersInfo bot={data} />
+          <TradingBotInfo bot={data} />
           <TradingBotOrdersTable
             botId={botId!}
             configs={{ baseCurrency: data.baseCurrency, quoteCurrency: data.quoteCurrency }}
