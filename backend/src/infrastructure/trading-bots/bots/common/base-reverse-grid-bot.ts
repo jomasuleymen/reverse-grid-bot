@@ -10,7 +10,7 @@ import {
 	TradePosition,
 	TradingBotOrder,
 	TradingBotSnapshot,
-} from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+} from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { retryWithFallback } from '@/infrastructure/utils/request.utils';
@@ -42,9 +42,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	private callBacks: IStartReverseBotOptions['callBacks'];
 
 	private readonly minCoinBalance = 10;
-	private readonly requestConfig = {
-		defaultAttempts: 2,
-	};
+
 	private readonly marketData = {
 		lastPrice: 0,
 	};
@@ -162,24 +160,9 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				(coin) => coin.coin === this.config.baseCurrency,
 			);
 
-			retryWithFallback(() =>
-				this.closeAllPositions(foundBaseCoin?.balance),
-			)
-				.then((res) => {
-					if (res.success) {
-						this.logger.info('Successfully closed all positions');
-					} else {
-						this.logger.error(
-							'Error while sellong bought currencies',
-							{
-								error: res.error,
-							},
-						);
-					}
-				})
-				.finally(() => {
-					this.callBacks.onStateUpdate(BotState.Stopped, this);
-				});
+			this.closeAllPositions(foundBaseCoin?.balance).finally(() => {
+				this.callBacks.onStateUpdate(BotState.Stopped, this);
+			});
 		} catch (err) {
 			this.logger.error('error while stopping bot', err);
 		} finally {
@@ -404,6 +387,15 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				side: this.STOP_LOSS_SIDE,
 				symbol: this.symbol,
 				type: 'order',
+			}).then((res) => {
+				if (res.success) {
+					this.logger.info('Successfully closed all positions');
+					console.log(res.data);
+				} else {
+					this.logger.error('Error while sellong bought currencies', {
+						error: res.error,
+					});
+				}
 			});
 		}
 	}

@@ -1,5 +1,5 @@
 import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
-import { ExchangeCredentialsType } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { ExchangeCredentialsType } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { IsEnum, IsString } from 'class-validator';
 
 export class CreateCredentialsDto {

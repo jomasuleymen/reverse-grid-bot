@@ -1,5 +1,5 @@
 import { OrderSide } from '@/domain/interfaces/exchanges/common.interface';
-import { TradingBotOrder } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { TradingBotOrder } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 
 type CalclatePnlOrderType = Pick<
 	TradingBotOrder,
@@ -10,7 +10,8 @@ export function calculateOrdersPnL(
 	orders: CalclatePnlOrderType[],
 	currentPrice: number = 0,
 ) {
-	const buyStack: CalclatePnlOrderType[] = []; // Stack to track buy orders for stop-losses
+	const buyStack: CalclatePnlOrderType[] = []; // Track long positions
+	const sellStack: CalclatePnlOrderType[] = []; // Track short positions
 	let totalProfit = 0;
 	let fee = 0;
 
@@ -18,44 +19,85 @@ export function calculateOrdersPnL(
 		currentPrice = orders[orders.length - 1]!.avgPrice;
 	}
 
+	const processClosingOrders = (
+		stack: CalclatePnlOrderType[],
+		orderPrice: number,
+		orderQuantity: number,
+		isLong: boolean,
+	) => {
+		let positionSum = 0;
+		let quantitySum = 0;
+
+		while (quantitySum < orderQuantity && stack.length > 0) {
+			const lastOrder = stack.pop()!;
+			const closingQuantity = Math.min(
+				lastOrder.quantity,
+				orderQuantity - quantitySum,
+			);
+
+			positionSum += lastOrder.avgPrice * closingQuantity;
+			quantitySum += closingQuantity;
+
+			if (lastOrder.quantity > closingQuantity) {
+				lastOrder.quantity -= closingQuantity;
+				stack.push(lastOrder); // Push back with updated quantity if partially closed
+			}
+		}
+
+		if (quantitySum > 0) {
+			const avgPositionPrice = positionSum / quantitySum;
+			const pnl =
+				(isLong
+					? orderPrice - avgPositionPrice
+					: avgPositionPrice - orderPrice) * quantitySum;
+			totalProfit += pnl;
+		}
+	};
+
 	orders.forEach((order) => {
 		if (order.side === OrderSide.BUY) {
-			buyStack.push(order);
-		} else if (order.side === OrderSide.SELL && buyStack.length > 0) {
-			let buySum = 0;
-			let buyQuantitySum = 0;
-
-			while (buyQuantitySum < order.quantity && buyStack.length > 0) {
-				const lastBuy = buyStack.pop()!;
-				const buyQuantity = Math.min(
-					lastBuy.quantity,
-					order.quantity - buyQuantitySum,
+			// If there are open short positions, attempt to close them with a buy order
+			if (sellStack.length > 0) {
+				processClosingOrders(
+					sellStack,
+					order.avgPrice,
+					order.quantity,
+					false,
 				);
-
-				buySum += lastBuy.avgPrice * buyQuantity;
-				buyQuantitySum += buyQuantity;
-
-				// Reduce quantity of the last buy if partially used
-				if (lastBuy.quantity > buyQuantity) {
-					lastBuy.quantity -= buyQuantity;
-					buyStack.push(lastBuy); // Put back with updated quantity
-				}
+			} else {
+				buyStack.push(order); // Open new long position
 			}
-
-			if (buyQuantitySum > 0) {
-				const avgBuyPrice = buySum / buyQuantitySum;
-				const sellPnL = (order.avgPrice - avgBuyPrice) * buyQuantitySum;
-				totalProfit += sellPnL;
+		} else if (order.side === OrderSide.SELL) {
+			// If there are open long positions, attempt to close them with a sell order
+			if (buyStack.length > 0) {
+				processClosingOrders(
+					buyStack,
+					order.avgPrice,
+					order.quantity,
+					true,
+				);
+			} else {
+				sellStack.push(order); // Open new short position
 			}
 		}
 
 		fee -= order.fee;
 	});
 
+	const unrealizedPnL =
+		buyStack.reduce(
+			(total, buyOrder) =>
+				total + (currentPrice - buyOrder.avgPrice) * buyOrder.quantity,
+			0,
+		) +
+		sellStack.reduce(
+			(total, sellOrder) =>
+				total +
+				(sellOrder.avgPrice - currentPrice) * sellOrder.quantity,
+			0,
+		);
+
 	const realizedPnL = totalProfit + fee;
-	const unrealizedPnL = buyStack.reduce((total, buyOrder) => {
-		return total + (currentPrice - buyOrder.avgPrice) * buyOrder.quantity;
-	}, 0);
 
 	return {
 		totalProfit,

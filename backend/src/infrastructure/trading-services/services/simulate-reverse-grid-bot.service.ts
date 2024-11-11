@@ -1,5 +1,5 @@
 import { OrderSide } from '@/domain/interfaces/exchanges/common.interface';
-import { ITradingBotConfig } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { ITradingBotConfig } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { Injectable } from '@nestjs/common';
 import { SECOND } from 'time-constants';

@@ -3,7 +3,7 @@ import {
 	BotState,
 	ExchangeCredentialsType,
 	TradePosition,
-} from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+} from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { ExchangeCredentialsEntity } from '@/infrastructure/exchanges/exchange-credentials/entites/exchange-credentials.entity';
 import { UserEntity } from '@/infrastructure/user/entities/user.entity';
 import {

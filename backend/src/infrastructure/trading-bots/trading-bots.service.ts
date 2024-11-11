@@ -10,7 +10,7 @@ import {
 	BotState,
 	ITradingBot,
 	TradingBotSnapshot,
-} from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+} from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { InjectQueue } from '@nestjs/bullmq';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';

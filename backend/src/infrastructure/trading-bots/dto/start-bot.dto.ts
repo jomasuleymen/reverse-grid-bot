@@ -1,4 +1,4 @@
-import { TradePosition } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { TradePosition } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsNumber, IsString } from 'class-validator';
 

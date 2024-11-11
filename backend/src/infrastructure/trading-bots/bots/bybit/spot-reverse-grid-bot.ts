@@ -3,7 +3,7 @@ import {
 	CreateTradingBotOrder,
 	ExchangeCredentialsType,
 	TradingBotOrder,
-} from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+} from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface';
 import { BybitService } from '@/infrastructure/exchanges/modules/bybit/bybit.service';
 import { retryWithFallback } from '@/infrastructure/utils/request.utils';
@@ -167,33 +167,24 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			},
 		);
 
-		if (walletBalanceRes.success && walletBalanceRes.data.result?.list) {
-			const accountBalance = walletBalanceRes.data.result.list.find(
-				(wallet) => wallet.accountType === this.accountType,
-			);
-
-			if (!accountBalance)
-				throw new Error(`Счёт ${this.accountType} не найден`);
-
-			const walletBalance: WalletBalance = {
-				accountType: accountBalance.accountType,
-				balanceInUsd: Number(accountBalance.totalWalletBalance),
-				coins: accountBalance.coin.map((coin) => ({
-					coin: coin.coin,
-					balance: Number(coin.walletBalance),
-					usdValue: Number(coin.usdValue),
-				})),
-			};
-
-			return walletBalance;
-		} else {
-			this.logger.error('Can not fetch wallet balance', walletBalanceRes);
-			return {
-				accountType: this.accountType,
-				balanceInUsd: 0,
-				coins: [],
-			};
+		if (!walletBalanceRes.success) {
+			this.logger.error('Failed to fetch wallet balance after retries', {
+				response: walletBalanceRes,
+			});
+			return this.bybitService.emptyWalletBalance();
 		}
+
+		const accountBalance = walletBalanceRes.data.result?.list?.find(
+			(wallet) => wallet.accountType === this.accountType,
+		);
+
+		if (!accountBalance) {
+			const errorMsg = `Account type "${this.accountType}" not found in wallet balance response.`;
+			this.logger.error(errorMsg, { response: walletBalanceRes });
+			return this.bybitService.emptyWalletBalance();
+		}
+
+		return this.bybitService.formatWalletBalance(accountBalance);
 	}
 
 	protected getCreateOrderParams(

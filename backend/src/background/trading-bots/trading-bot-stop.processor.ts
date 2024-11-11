@@ -1,5 +1,5 @@
 import { IStopTradingBotQueueData } from '@/domain/interfaces/trading-bots/trading-bot-job.interface';
-import { BotState } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { BotState } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { QUEUES } from '@/infrastructure/services/bull/bull.const';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { TradingBotService } from '@/infrastructure/trading-bots/trading-bots.service';

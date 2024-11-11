@@ -11,7 +11,6 @@ import LoggerService from '../logger/logger.service';
 @Injectable()
 export class TelegramService {
 	public readonly bot?: TelegramBot;
-	private readonly allowedUserIds: Set<number>;
 
 	constructor(
 		private readonly configService: ConfigService,
@@ -19,15 +18,6 @@ export class TelegramService {
 		private readonly logger: LoggerService,
 	) {
 		const botToken = this.configService.get<string>('telegram.bot.token');
-		this.allowedUserIds = new Set(this.getAllowedUserIds());
-
-		if (this.allowedUserIds.size) {
-			this.logger.info(
-				`Telegram bot - allowed user ids: ${Array.from(this.allowedUserIds)}`,
-			);
-		} else {
-			this.logger.warn('Telegram bot has not allowed users');
-		}
 
 		if (botToken) {
 			this.bot = new TelegramBot(botToken, { polling: true });
@@ -35,15 +25,6 @@ export class TelegramService {
 		} else {
 			this.logger.warn('Telegram bot token not provided');
 		}
-	}
-
-	private getAllowedUserIds(): number[] {
-		const chatIds = this.configService.get<(string | number)[]>(
-			'telegram.allowedUserIds',
-		);
-		return Array.isArray(chatIds)
-			? chatIds.map(Number).filter(Number.isInteger)
-			: [];
 	}
 
 	private handleErrors(): void {

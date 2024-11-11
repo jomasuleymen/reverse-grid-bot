@@ -1,6 +1,6 @@
 import { OrderSide } from '@/domain/interfaces/exchanges/common.interface';
 import { IStartTradingBotQueueData } from '@/domain/interfaces/trading-bots/trading-bot-job.interface';
-import { BotState } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { BotState } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { ExchangeCredentialsService } from '@/infrastructure/exchanges/exchange-credentials/exchange-credentials.service';
 import { QUEUES } from '@/infrastructure/services/bull/bull.const';
 import LoggerService from '@/infrastructure/services/logger/logger.service';

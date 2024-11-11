@@ -1,6 +1,6 @@
 import { DATABASES } from '@/configs/typeorm';
 import { IReverseGridBotSimulateQueueData } from '@/domain/interfaces/trading-bots/trading-bot-job.interface';
-import { TradePosition } from '@/domain/interfaces/trading-bots/trading-bot.interface.interface';
+import { TradePosition } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { TradingBotSimulatorStatus } from '@/domain/interfaces/trading-services/trading-services.interface';
 import { QUEUES } from '@/infrastructure/services/bull/bull.const';
 import LoggerService from '@/infrastructure/services/logger/logger.service';

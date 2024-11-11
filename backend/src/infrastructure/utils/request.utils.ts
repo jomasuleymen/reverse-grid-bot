@@ -1,50 +1,51 @@
 import sleep from 'sleep-promise';
 
 interface IRetryWithFallbackOptions<T> {
-	attempts: number;
-	delay: number;
+	attempts?: number;
+	delay?: number;
 	checkIfSuccess?: (res: T) => { success: boolean; message: string };
 }
 
 type IRetryWillFallbackResult<T> =
-	| {
-			success: true;
-			data: T;
-	  }
-	| {
-			success: false;
-			error: any;
-	  };
+	| { success: true; data: T }
+	| { success: false; error: any };
+
+const DEFAULT_ATTEMPTS = 2;
+const DEFAULT_DELAY = 500;
 
 export const retryWithFallback = async <T>(
 	callback: () => Promise<T>,
-	options: IRetryWithFallbackOptions<T> = {
-		attempts: 2,
-		delay: 500,
-	},
+	options: IRetryWithFallbackOptions<T> = {},
 ): Promise<IRetryWillFallbackResult<T>> => {
-	let { attempts, delay } = options;
+	const {
+		attempts = DEFAULT_ATTEMPTS,
+		delay = DEFAULT_DELAY,
+		checkIfSuccess,
+	} = options;
 
-	while (attempts > 0) {
+	for (let attempt = 1; attempt <= attempts; attempt++) {
 		try {
 			const data = await callback();
 
-			if (options.checkIfSuccess) {
-				const isSuccessRes = options.checkIfSuccess(data);
-				if (!isSuccessRes.success)
-					throw new Error(isSuccessRes.message);
+			if (checkIfSuccess) {
+				const { success, message } = checkIfSuccess(data);
+				if (!success) {
+					throw new Error(message);
+				}
 			}
 
 			return { success: true, data };
 		} catch (error: any) {
-			attempts -= 1;
-			if (attempts === 0) {
+			if (attempt === attempts) {
 				return { success: false, error };
 			}
 
-			await sleep(delay); // delay before retry
+			await sleep(delay);
 		}
 	}
 
-	return { success: false, error: 'Reached at the end of retryWithFallback' };
+	return {
+		success: false,
+		error: 'Reached end of retryWithFallback without success',
+	};
 };

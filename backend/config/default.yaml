@@ -1,27 +1,15 @@
-binance:
-    api:
-        key: 
-        secret: 
-
-bybit:
-    api:
-        key: 
-        secret: 
-
 telegram:
     bot:
-        token: 
-    allowedUserIds:
-        - 
+        token:
 
 logger:
     type: local # local | axiom
 
     axiom:
-        token: 
-        dataset: 
+        token:
+        dataset:
 
-origins: 
+origins:
     - http://127.0.0.1:5173
     - http://localhost:5173
 
