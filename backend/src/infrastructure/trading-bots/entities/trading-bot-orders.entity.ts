@@ -25,6 +25,9 @@ export class TradingBotOrdersEntity {
 	@Column({ type: 'real' })
 	avgPrice: number;
 
+	@Column({ type: 'real', nullable: true })
+	triggerPrice: number;
+
 	@Column({ type: 'real' })
 	quantity: number;
 

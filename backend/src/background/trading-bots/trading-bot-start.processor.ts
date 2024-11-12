@@ -1,4 +1,3 @@
-import { OrderSide } from '@/domain/interfaces/exchanges/common.interface';
 import { IStartTradingBotQueueData } from '@/domain/interfaces/trading-bots/trading-bot-job.interface';
 import { BotState } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { ExchangeCredentialsService } from '@/infrastructure/exchanges/exchange-credentials/exchange-credentials.service';
@@ -7,7 +6,6 @@ import LoggerService from '@/infrastructure/services/logger/logger.service';
 import TelegramService from '@/infrastructure/services/telegram/telegram.service';
 import { TradingBotOrdersService } from '@/infrastructure/trading-bots/trading-bot-orders.service';
 import { TradingBotService } from '@/infrastructure/trading-bots/trading-bots.service';
-import { calculateOrdersPnL } from '@/infrastructure/utils/trading-orders.util';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { BadRequestException } from '@nestjs/common';
 import { Job } from 'bullmq';
@@ -56,14 +54,18 @@ export class TradingBotStartConsumer extends WorkerHost {
 				},
 				credentials,
 				callBacks: {
-					onStateUpdate: async (state, bot) => {
-						const snapshots = bot.getSnapshots();
+					onStateUpdate: async (state, data = {}) => {
+						const { snapshots, stoppedReason } = data;
+						const botState =
+							await this.tradingBotService.getBotStatus(
+								botEntity.id,
+							);
 
 						if (state === BotState.Running) {
 							await this.telegramService.sendMessage(
 								userId,
 								this.tradingBotService.getSnapshotMessage(
-									snapshots.start!,
+									snapshots?.start!,
 								),
 							);
 
@@ -71,23 +73,29 @@ export class TradingBotStartConsumer extends WorkerHost {
 								state: BotState.Running,
 							});
 						} else if (state === BotState.Stopped) {
-							await this.telegramService.sendMessage(
-								userId,
-								`------ Открытие ------\n\n` +
-									this.tradingBotService.getSnapshotMessage(
-										snapshots.start!,
-									) +
-									'\n\n' +
-									`------ Закрытие ------\n\n` +
-									this.tradingBotService.getSnapshotMessage(
-										snapshots.end!,
-									),
-							);
+							if (
+								botState !== BotState.Stopped &&
+								botState !== BotState.Errored
+							) {
+								await this.tradingBotService.update(botId, {
+									state: BotState.Stopped,
+									stoppedAt: new Date(),
+									stopReason: stoppedReason,
+								});
 
-							await this.tradingBotService.update(botId, {
-								state: BotState.Stopped,
-								stoppedAt: new Date(),
-							});
+								await this.telegramService.sendMessage(
+									userId,
+									`------ Открытие ------\n\n` +
+										this.tradingBotService.getSnapshotMessage(
+											snapshots?.start!,
+										) +
+										'\n\n' +
+										`------ Закрытие ------\n\n` +
+										this.tradingBotService.getSnapshotMessage(
+											snapshots?.end!,
+										),
+								);
+							}
 						} else if (state === BotState.Initializing) {
 							await this.tradingBotService.update(botId, {
 								state: BotState.Initializing,
@@ -95,6 +103,14 @@ export class TradingBotStartConsumer extends WorkerHost {
 						} else if (state === BotState.Stopping) {
 							await this.tradingBotService.update(botId, {
 								state: BotState.Stopping,
+								stopReason: stoppedReason,
+							});
+						} else if (state === BotState.Errored) {
+							await this.tradingBotService.update(botId, {
+								state: BotState.Errored,
+								stoppedAt: new Date(),
+								stopReason:
+									stoppedReason || 'Неизвестная ошибка',
 							});
 						}
 					},
@@ -105,7 +121,7 @@ export class TradingBotStartConsumer extends WorkerHost {
 						);
 					},
 
-					onNewOrder: async (order, triggerPrice, orders) => {
+					onNewOrder: async (order) => {
 						await this.botOrdersService.save(botEntity.id, {
 							orderId: order.id,
 							avgPrice: order.avgPrice,
@@ -116,27 +132,28 @@ export class TradingBotStartConsumer extends WorkerHost {
 							side: order.side,
 							symbol: order.symbol,
 							createdDate: order.createdDate,
+							triggerPrice: order.triggerPrice,
 						});
 
-						const sellCount = orders.filter(
-							(o) => o.side === OrderSide.SELL,
-						).length;
-						const buyCount = orders.length - sellCount;
+						const summary =
+							await this.tradingBotService.getBotSummary(
+								botEntity.id,
+							);
 
-						const pnl = calculateOrdersPnL(orders);
+						const { buyCount, sellCount, pnl } = summary;
 
 						const message = `BYBIT
 					📈 **Информация об ордере**
 					- Сторона: ${order.side}
-					- Триггерная цена: ${triggerPrice}
+					- Триггерная цена: ${order.triggerPrice}
 					- Покупная цена: ${order.avgPrice}
 					
 					💰 **Доходность**
-					- Прибыль: ${pnl.totalProfit.toFixed(2)}
-					- Комиссия: ${pnl.fee.toFixed(2)}
-					- Realized PnL: ${pnl.realizedPnL.toFixed(2)}
-					- Unrealized PnL: ${pnl.unrealizedPnL.toFixed(2)}
 					- PnL: ${pnl.PnL.toFixed(2)}
+					- Unrealized PnL: ${pnl.unrealizedPnL.toFixed(2)}
+					- Realized PnL: ${pnl.realizedPnL.toFixed(2)}
+					- Убыток: ${pnl.totalProfit.toFixed(2)}
+					- Комиссия: ${pnl.fee.toFixed(2)}
 
 					🔄 **Общее количество операций**
 					- Покупки: ${buyCount}

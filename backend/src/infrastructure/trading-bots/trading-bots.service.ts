@@ -20,6 +20,7 @@ import { Equal, FindOptionsWhere, In, Or, Repository } from 'typeorm';
 import { ExchangeCredentialsService } from '../exchanges/exchange-credentials/exchange-credentials.service';
 import { QUEUES } from '../services/bull/bull.const';
 import { calculateOrdersPnL } from '../utils/trading-orders.util';
+import { BinanceSpotReverseGridBot } from './bots/binance/spot-reverse-grid-bot';
 import { BybitSpotReverseGridBot } from './bots/bybit/spot-reverse-grid-bot';
 import { GetTradingBotsDto } from './dto/get-bots.dto';
 import { StartBotDto } from './dto/start-bot.dto';
@@ -158,19 +159,17 @@ export class TradingBotService {
 	public getSnapshotMessage(snapshot: TradingBotSnapshot): string {
 		if (!snapshot?.walletBalance) return 'Нету данные';
 
-		const coin = snapshot.walletBalance.coins
+		const coinsBalances = snapshot.walletBalance.coins
 			.map(
 				(c) =>
 					`----- ${c.coin} -----\n` +
-					`Баланс: ${c.balance.toFixed(4)} ${c.coin}\n` +
-					`Баланс(USD): ${c.usdValue.toFixed(1)} USD\n`,
+					`Баланс: ${c.balance.toFixed(6)} ${c.coin}\n`,
 			)
 			.join('\n');
 
 		return (
 			`Счёт: ${snapshot.walletBalance.accountType}\n` +
-			`Баланс(USD): ${snapshot.walletBalance.balanceInUsd.toFixed(1)}\n` +
-			`\n${coin}\n` +
+			`\n${coinsBalances}\n` +
 			`Время: ${snapshot.datetime.toLocaleString('ru-RU', {
 				timeZone: 'Asia/Almaty',
 			})}`
@@ -181,6 +180,8 @@ export class TradingBotService {
 		switch (exchange) {
 			case ExchangeEnum.Bybit:
 				return await this.moduleRef.resolve(BybitSpotReverseGridBot);
+			case ExchangeEnum.Binance:
+				return await this.moduleRef.resolve(BinanceSpotReverseGridBot);
 			default:
 				throw new Error('Биржа не поддерживается');
 		}

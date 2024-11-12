@@ -1,22 +1,28 @@
 import sleep from 'sleep-promise';
 
-interface IRetryWithFallbackOptions<T> {
+interface RetryWithFallbackOptions<T> {
 	attempts?: number;
 	delay?: number;
-	checkIfSuccess?: (res: T) => { success: boolean; message: string };
+	checkIfSuccess?: (res: T) => CheckResult;
 }
 
-type IRetryWillFallbackResult<T> =
-	| { success: true; data: T }
-	| { success: false; error: any };
+type CheckResult = {
+	success: boolean;
+	message: string;
+	forceAbort?: boolean;
+};
+
+export type FallbackResult<T = any> =
+	| { ok: true; data: T }
+	| { ok: false; message: string; error?: Error };
 
 const DEFAULT_ATTEMPTS = 2;
-const DEFAULT_DELAY = 500;
+const DEFAULT_DELAY = 400;
 
-export const retryWithFallback = async <T>(
+export async function retryWithFallback<T>(
 	callback: () => Promise<T>,
-	options: IRetryWithFallbackOptions<T> = {},
-): Promise<IRetryWillFallbackResult<T>> => {
+	options: RetryWithFallbackOptions<T> = {},
+): Promise<FallbackResult<T>> {
 	const {
 		attempts = DEFAULT_ATTEMPTS,
 		delay = DEFAULT_DELAY,
@@ -28,24 +34,37 @@ export const retryWithFallback = async <T>(
 			const data = await callback();
 
 			if (checkIfSuccess) {
-				const { success, message } = checkIfSuccess(data);
+				const { success, message, forceAbort } = checkIfSuccess(data);
+
+				if (forceAbort) {
+					return {
+						ok: false,
+						message,
+						error: new Error('Force abort triggered'),
+					};
+				}
+
 				if (!success) {
 					throw new Error(message);
 				}
 			}
 
-			return { success: true, data };
+			return { ok: true, data };
 		} catch (error: any) {
 			if (attempt === attempts) {
-				return { success: false, error };
+				return {
+					ok: false,
+					message:
+						error instanceof Error
+							? error.message
+							: 'Unknown error occurred',
+					error,
+				};
 			}
 
-			await sleep(delay);
+			await sleep(delay); // Wait before retrying
 		}
 	}
 
-	return {
-		success: false,
-		error: 'Reached end of retryWithFallback without success',
-	};
-};
+	return { ok: false, message: 'Unexpected end of retry loop' };
+}

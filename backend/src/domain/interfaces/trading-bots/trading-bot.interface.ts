@@ -1,4 +1,3 @@
-import { BaseReverseGridBot } from '@/infrastructure/trading-bots/bots/common/base-reverse-grid-bot';
 import { ExchangeEnum, OrderSide } from '../exchanges/common.interface';
 import { WalletBalance } from './wallet.interface';
 
@@ -12,6 +11,7 @@ export type TradingBotOrder = {
 	fee: number;
 	symbol: string;
 	createdDate: Date;
+	triggerPrice?: number;
 };
 
 export type CreateTradingBotOrder = {
@@ -30,7 +30,6 @@ export type CreateTradingBotOrder = {
 );
 
 export type TradingBotSnapshot = {
-	currentPrice: number;
 	datetime: Date;
 	walletBalance: WalletBalance;
 };
@@ -76,15 +75,17 @@ export interface IStartReverseBotOptions {
 	credentials: IExchangeCredentials;
 	callBacks: {
 		checkBotState: () => Promise<BotState>;
-		onNewOrder: (
-			order: TradingBotOrder,
-			triggerPrice: number,
-			orders: TradingBotOrder[],
-		) => Promise<void>;
+		onNewOrder: (order: TradingBotOrder) => Promise<void>;
 
 		onStateUpdate: (
 			state: BotState,
-			bot: BaseReverseGridBot,
+			data?: {
+				snapshots?: {
+					start?: TradingBotSnapshot;
+					end?: TradingBotSnapshot;
+				};
+				stoppedReason?: string;
+			},
 		) => Promise<void>;
 	};
 }

@@ -9,18 +9,13 @@ import { BybitService } from '@/infrastructure/exchanges/modules/bybit/bybit.ser
 import { retryWithFallback } from '@/infrastructure/utils/request.utils';
 import { Injectable, Scope } from '@nestjs/common';
 import {
-	BatchOrderParamsV5,
 	OrderParamsV5,
 	RestClientV5,
 	WalletBalanceV5,
 	WebsocketClient,
 } from 'bybit-api';
+import { SECOND } from 'time-constants';
 import { BaseReverseGridBot } from '../common/base-reverse-grid-bot';
-
-/**
- * TODO
- * 1. check for grids count. max grid count must be 25. if reaches to 25, then sell first orders to make grid count to 25.
- */
 
 @Injectable({ scope: Scope.TRANSIENT })
 export class BybitSpotReverseGridBot extends BaseReverseGridBot {
@@ -43,6 +38,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			key: this.credentials.apiKey,
 			secret: this.credentials.apiSecret,
 			demoTrading: isTestnet,
+			recv_window: 10 * SECOND,
 		});
 
 		this.wsClient = new WebsocketClient({
@@ -67,11 +63,9 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	private configureWsEmits() {
 		this.publicWsClient.on('update', (data) => {
 			if (!data) return;
-			if (data.topic === `tickers.${this.symbol}`) {
-				if (data.data) {
-					const lastPrice = Number(data.data.lastPrice);
-					this.updateLastPrice(lastPrice);
-				}
+
+			if (data.topic === `tickers.${this.symbol}` && data.data) {
+				this.updateLastPrice(Number(data.data.lastPrice));
 			}
 		});
 
@@ -80,15 +74,15 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 
 			if (data.topic === 'order' && data.data) {
 				for (let order of data.data) {
-					if (order.orderStatus === 'Filled') {
-						await this.handleNewFilledOrder(order);
+					if (
+						order.orderStatus === 'Filled' &&
+						this.symbol === order.symbol
+					) {
+						const parsedOrder = this.parseIncomingOrder(order);
+						await this.handleNewFilledOrder(parsedOrder);
 					}
 				}
 			}
-		});
-
-		this.wsClient.on('open', () => {
-			this.logger.info('WS OPENED');
 		});
 
 		this.wsClient.on('response', (data) => {
@@ -99,6 +93,10 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			}
 		});
 
+		this.wsClient.on('open', () => {
+			this.logger.info('WS OPENED');
+		});
+
 		this.wsClient.on('reconnect', (data) => {
 			this.logger.info('ws reconnecting.... ');
 		});
@@ -106,15 +104,6 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		this.wsClient.on('reconnected', (data) => {
 			this.logger.info('ws reconnected ');
 		});
-	}
-
-	protected async isExistsSymbol(symbol: string): Promise<boolean> {
-		const coinPriceRes = await this.restClient.getTickers({
-			category: 'spot' as any,
-			symbol,
-		});
-
-		return !!coinPriceRes.result?.list?.length;
 	}
 
 	protected async cancelAllOrders(): Promise<void> {
@@ -132,7 +121,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		});
 	}
 
-	protected async cleanUp() {
+	protected async cleanUpImpl() {
 		if (this.wsClient) {
 			this.wsClient.closeAll(true);
 			this.wsClient.removeAllListeners();
@@ -167,11 +156,11 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			},
 		);
 
-		if (!walletBalanceRes.success) {
+		if (!walletBalanceRes.ok) {
 			this.logger.error('Failed to fetch wallet balance after retries', {
 				response: walletBalanceRes,
 			});
-			return this.bybitService.emptyWalletBalance();
+			return this.exchangesService.emptyWalletBalance();
 		}
 
 		const accountBalance = walletBalanceRes.data.result?.list?.find(
@@ -181,15 +170,13 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		if (!accountBalance) {
 			const errorMsg = `Account type "${this.accountType}" not found in wallet balance response.`;
 			this.logger.error(errorMsg, { response: walletBalanceRes });
-			return this.bybitService.emptyWalletBalance();
+			return this.exchangesService.emptyWalletBalance();
 		}
 
 		return this.bybitService.formatWalletBalance(accountBalance);
 	}
 
-	protected getCreateOrderParams(
-		order: CreateTradingBotOrder,
-	): OrderParamsV5 {
+	private getCreateOrderParams(order: CreateTradingBotOrder): OrderParamsV5 {
 		const params: OrderParamsV5 = {
 			category: 'spot',
 			side: order.side === OrderSide.BUY ? 'Buy' : 'Sell',
@@ -216,7 +203,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		return params;
 	}
 
-	protected parseIncomingOrder(order: any): TradingBotOrder {
+	private parseIncomingOrder(order: any): TradingBotOrder {
 		return {
 			id: order.orderId,
 			avgPrice: Number(order.avgPrice),
@@ -225,35 +212,40 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			feeCurrency: order.feeCurrency,
 			quantity: Number(order.qty),
 			side: order.side === 'Buy' ? OrderSide.BUY : OrderSide.SELL,
-			symbol: this.symbol,
+			symbol: order.symbol || this.symbol,
 			createdDate: new Date(Number(order.updatedTime) || 0),
 		};
 	}
 
-	protected async submitOrderImpl(orderParams: OrderParamsV5): Promise<void> {
-		const response = await this.restClient.submitOrder(orderParams);
-		if (response.retCode === 0) {
-			return;
-		} else {
-			throw new Error(response.retMsg);
-		}
-	}
-
-	protected async submitManyOrdersImpl(
-		ordersParams: BatchOrderParamsV5[],
-	): Promise<void> {
-		const response = await this.restClient.batchSubmitOrders(
-			'spot' as any,
-			ordersParams,
+	protected async submitOrdersImpl(
+		orders: CreateTradingBotOrder[],
+	): Promise<any> {
+		const ordersParams = orders.map((order) =>
+			this.getCreateOrderParams(order),
 		);
 
-		if (response.retCode === 0) {
-		} else {
-			throw new Error(response.retMsg);
-		}
+		const impl: any =
+			ordersParams.length === 1
+				? () => this.restClient.submitOrder(ordersParams[0]!)
+				: () =>
+						this.restClient.batchSubmitOrders(
+							'spot' as any,
+							ordersParams,
+						);
+
+		return await retryWithFallback(impl, {
+			attempts: 3,
+			delay: 500,
+			checkIfSuccess(res: any) {
+				return {
+					success: res.retCode === 0,
+					message: res.retMsg,
+				};
+			},
+		});
 	}
 
-	protected async getTickerLastPrice(ticker: string): Promise<number> {
+	protected async getTickerPrice(ticker: string): Promise<number> {
 		return this.bybitService.getTickerLastPrice('spot', ticker);
 	}
 
