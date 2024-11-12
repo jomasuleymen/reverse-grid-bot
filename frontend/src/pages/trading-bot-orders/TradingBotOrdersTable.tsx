@@ -41,17 +41,6 @@ const getColumns = (config: Props['configs']): ColumnsType<TradingBotOrder> => [
     ),
   },
   {
-    title: 'Покупная цена',
-    dataIndex: 'avgPrice',
-    align: 'center',
-    sorter: (a, b) => a.avgPrice - b.avgPrice,
-    render: (value) => (
-      <span>
-        {value.toFixed(2)} {config.quoteCurrency}
-      </span>
-    ),
-  },
-  {
     title: 'Сторона',
     dataIndex: 'side',
     align: 'center',
@@ -71,6 +60,30 @@ const getColumns = (config: Props['configs']): ColumnsType<TradingBotOrder> => [
     ),
   },
   {
+    title: 'Покупная цена',
+    dataIndex: 'avgPrice',
+    align: 'center',
+    sorter: (a, b) => a.avgPrice - b.avgPrice,
+    render: (value) => (
+      <span>
+        {value.toFixed(2)} {config.quoteCurrency}
+      </span>
+    ),
+  },
+  {
+    title: 'Триггерная цена',
+    dataIndex: 'triggerPrice',
+    align: 'center',
+    render: (value) =>
+      value ? (
+        <span>
+          {value.toFixed(2)} {config.quoteCurrency}
+        </span>
+      ) : (
+        '-'
+      ),
+  },
+  {
     title: 'Комиссия',
     dataIndex: 'fee',
     align: 'center',
@@ -86,12 +99,6 @@ const getColumns = (config: Props['configs']): ColumnsType<TradingBotOrder> => [
     align: 'center',
     sorter: (a, b) => new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime(),
     render: (value: Date) => <span>{formatDate(value, { showTime: true })}</span>,
-  },
-  {
-    title: 'Кастомный ID',
-    dataIndex: 'customId',
-    align: 'center',
-    render: (value) => <span>{value}</span>,
   },
 ]
 

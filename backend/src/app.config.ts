@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import { ValidationException } from "./common/exceptions/validation.exceptions";
 import { AllExceptionFilter } from "./common/filter/exception.filter";
+import { isInitTypeEnv, TYPE_ENV } from "./init";
 
 export const configApp = async (app: INestApplication<any>) => {
 	const configService = app.get<ConfigService>(ConfigService);
@@ -34,10 +35,17 @@ export const configApp = async (app: INestApplication<any>) => {
 		],
 	});
 
-	const PORT = configService.getOrThrow<number>("SERVER_PORT");
-	await app.listen(PORT, () => {
-		console.log(`Server started on port ${PORT}`);
-		console.log("Origins: ", origins);
-		console.log("Environment:", process.env.NODE_ENV);
-	});
+	if (isInitTypeEnv(TYPE_ENV.FACE)) {
+		const PORT = configService.getOrThrow<number>("SERVER_PORT");
+		await app.listen(PORT, () => {
+			console.log(`Server started on port ${PORT}`);
+			console.log("Origins: ", origins);
+			console.log("Environment:", process.env.NODE_ENV);
+		});
+	  } else {
+		console.log('STARTED INIT');
+		await app.init();
+	  }
+
+
 };

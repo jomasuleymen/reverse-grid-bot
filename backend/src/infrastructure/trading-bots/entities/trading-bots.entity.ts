@@ -50,6 +50,7 @@ export class TradingBotEntity {
 	@Column({ type: 'integer', default: TradePosition.LONG })
 	position: TradePosition;
 
+	@Index()
 	@Column({ type: 'integer', default: BotState.Idle })
 	state: BotState;
 

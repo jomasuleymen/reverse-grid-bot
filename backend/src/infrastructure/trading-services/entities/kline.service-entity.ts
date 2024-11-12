@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
 
 @Entity('kline')
 @Unique(['symbol', 'openTime'])
@@ -9,6 +9,7 @@ export class KlineEntity {
 	@Column()
 	symbol: string;
 
+	@Index()
 	@Column({ type: 'bigint' })
 	openTime: number;
 
@@ -27,6 +28,7 @@ export class KlineEntity {
 	@Column('decimal', { precision: 18, scale: 8 })
 	volume: number;
 
+	@Index()
 	@Column({ type: 'bigint' })
 	closeTime: number;
 

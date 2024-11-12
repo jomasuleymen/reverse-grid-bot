@@ -15,6 +15,13 @@ export function calculateOrdersPnL(
 	let totalProfit = 0;
 	let fee = 0;
 
+	const statistics = {
+		maxPnl: {
+			value: 0,
+			order: null as unknown,
+		},
+	};
+
 	if (!currentPrice && orders.length) {
 		currentPrice = orders[orders.length - 1]!.avgPrice;
 	}
@@ -54,6 +61,23 @@ export function calculateOrdersPnL(
 		}
 	};
 
+	const calculateUnrealizedPnl = () => {
+		return (
+			buyStack.reduce(
+				(total, buyOrder) =>
+					total +
+					(currentPrice - buyOrder.avgPrice) * buyOrder.quantity,
+				0,
+			) +
+			sellStack.reduce(
+				(total, sellOrder) =>
+					total +
+					(sellOrder.avgPrice - currentPrice) * sellOrder.quantity,
+				0,
+			)
+		);
+	};
+
 	orders.forEach((order) => {
 		if (order.side === OrderSide.BUY) {
 			// If there are open short positions, attempt to close them with a buy order
@@ -82,21 +106,15 @@ export function calculateOrdersPnL(
 		}
 
 		fee -= order.fee;
+
+		const unrealizedPnL = calculateUnrealizedPnl();
+		if (unrealizedPnL > statistics.maxPnl.value) {
+			statistics.maxPnl.value = unrealizedPnL;
+			statistics.maxPnl.order = order;
+		}
 	});
 
-	const unrealizedPnL =
-		buyStack.reduce(
-			(total, buyOrder) =>
-				total + (currentPrice - buyOrder.avgPrice) * buyOrder.quantity,
-			0,
-		) +
-		sellStack.reduce(
-			(total, sellOrder) =>
-				total +
-				(sellOrder.avgPrice - currentPrice) * sellOrder.quantity,
-			0,
-		);
-
+	const unrealizedPnL = calculateUnrealizedPnl();
 	const realizedPnL = totalProfit + fee;
 
 	return {
@@ -105,5 +123,6 @@ export function calculateOrdersPnL(
 		realizedPnL,
 		unrealizedPnL,
 		PnL: realizedPnL + unrealizedPnL,
+		statistics,
 	};
 }

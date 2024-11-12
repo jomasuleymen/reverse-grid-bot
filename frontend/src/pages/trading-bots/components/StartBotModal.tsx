@@ -7,9 +7,18 @@ import { SERVICES } from '@/services'
 import { ExchangeCredentials } from '@/services/exchanges.service'
 import { IStartBotOptions, TradingBotConfig } from '@/services/trading-bot.service'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Col, Form, FormItemProps, Modal, Row, Select, Space } from 'antd'
+import { Alert, Button, Col, Form, FormItemProps, Modal, Row, Select, Space } from 'antd'
 import React, { useState } from 'react'
 import { TRADING_BOTS_QUERY_KEY } from '..'
+
+const tradingPrerequisitesMessages = [
+  'Валюта тикера используется как залог для маржинальной торговли',
+  'Маржинальная торговля включена для данной валюты',
+  'Доступный баланс для маржинальной торговли имеется в кошельке',
+  'Маржинальная ставка не превышает установленный предел',
+  'Доступны необходимые разрешения для проведения маржинальных операций',
+  'Пользователь подтвердил рискованность маржинальной торговли',
+]
 
 const getFormItem = (item: FormItemProps) => {
   return (
@@ -151,6 +160,22 @@ const StartBotModal: React.FC = () => {
           )}
 
           {isError && <ErrorDisplay className="mb-2" error={error as any} />}
+
+          <Alert
+            message={<b>Проверьте перед запуском бота!</b>}
+            className="mb-2"
+            description={
+              <ul>
+                {tradingPrerequisitesMessages.map((text, index) => (
+                  <li key={index}>
+                    {index + 1}. {text}
+                  </li>
+                ))}
+              </ul>
+            }
+            type="warning"
+            showIcon
+          />
 
           <Row justify="end" gutter={10}>
             <Col>

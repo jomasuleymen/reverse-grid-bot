@@ -51,6 +51,7 @@ export type TradingBotOrder = {
   feeCurrency: string
   customId: string
   avgPrice: number
+  triggerPrice: number
   quantity: number
   side: TradingOrderSide
   fee: number

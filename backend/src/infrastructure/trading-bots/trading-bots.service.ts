@@ -128,9 +128,9 @@ export class TradingBotService {
 		const bot = await this.tradingBotRepo.findOne({
 			where: { id: Equal(botId) },
 		});
-
+		
 		if (!bot) throw new BadRequestException('Бот не найден');
-
+		
 		const orders = await this.tradingBotOrdersService.findByBotId(botId);
 
 		const pnl = calculateOrdersPnL(orders);
