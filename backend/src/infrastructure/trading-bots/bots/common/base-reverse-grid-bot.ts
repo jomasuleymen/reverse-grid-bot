@@ -349,6 +349,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				this.shouldCreateMissedTrigger(this.marketData.currentPrice)
 			) {
 				const missedTriggerPrice = this.getMissedTriggerPrice();
+
 				orders.push({
 					side: this.TRIGGER_SIDE,
 					triggerPrice: missedTriggerPrice,
@@ -365,10 +366,10 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			}
 
 			if (orders.length) {
-				await this.submitOrders(orders);
+				this.submitOrders(orders);
 			}
 
-			await sleep(2000);
+			await sleep(50);
 		}
 	}
 
@@ -420,8 +421,8 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		this.orders.push(order);
 		this.callBacks.onNewOrder(order);
 
-		const buyOrdersInSeries = this.getStopLossCount();
-		if (this.config.takeProfitOnGrid <= buyOrdersInSeries) {
+		const stopLossCount = this.getStopLossCount();
+		if (this.config.takeProfitOnGrid <= stopLossCount) {
 			this.stop();
 		}
 	}
@@ -462,7 +463,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 					orders,
 					response: res,
 				});
-				return { ok: true, data: res };
+				return { ok: true, data: res.data };
 			}
 
 			this.logger.error('Failed to place orders', {
@@ -505,7 +506,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				return;
 			}
 
-			await sleep(100);
+			await sleep(300);
 		}
 	}
 

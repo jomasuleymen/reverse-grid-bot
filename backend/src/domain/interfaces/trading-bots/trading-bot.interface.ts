@@ -96,8 +96,8 @@ export interface ITradingBot {
 }
 
 export enum OrderCreationType {
-	FIRST_TRADE = 'FIRST',
-	TRIGGER = 'TG',
-	STOP_LOSS = 'SL',
-	LAST_TRADE = 'LAST',
+	FIRST_TRADE = 1,
+	TRIGGER = 2,
+	STOP_LOSS = 3,
+	LAST_TRADE = 4,
 }
