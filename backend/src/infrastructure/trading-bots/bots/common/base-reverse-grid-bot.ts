@@ -143,11 +143,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 			this.snapshots.end = await this.createSnapshot();
 
-			const foundBaseCoin = this.snapshots.end.walletBalance.coins.find(
+			this.snapshots.end.walletBalance.coins.find(
 				(coin) => coin.coin === this.config.baseCurrency,
 			);
 
-			this.closeAllPositions(foundBaseCoin?.balance);
+			await this.closeAllPositions();
 		} catch (err) {
 			this.logger.error('error while stopping bot', err);
 		} finally {
@@ -383,14 +383,12 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		);
 	}
 
-	private async closeAllPositions(maxQuantity?: number) {
+	private async closeAllPositions() {
 		let allQuantity = 0;
 		for (const order of this.orders) {
 			if (order.side === this.TRIGGER_SIDE) allQuantity += order.quantity;
 			else allQuantity -= order.quantity;
 		}
-
-		if (maxQuantity && allQuantity > maxQuantity) allQuantity = maxQuantity;
 
 		if (allQuantity > 0) {
 			await this.submitOrders({
@@ -409,9 +407,10 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 						res.data,
 					);
 				} else {
-					this.logger.error('Error while sellong bought currencies', {
-						error: res.error,
-					});
+					this.logger.error(
+						'Error while sellong bought currencies',
+						res.error,
+					);
 				}
 			});
 		}
