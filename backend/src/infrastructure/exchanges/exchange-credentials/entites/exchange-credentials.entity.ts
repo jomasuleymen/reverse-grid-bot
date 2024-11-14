@@ -24,6 +24,12 @@ export class ExchangeCredentialsEntity {
 	})
 	type: ExchangeCredentialsType;
 
+	@Column({
+		type: 'text',
+		default: '',
+	})
+	name: string;
+
 	@Column()
 	@Exclude()
 	apiKey: string;

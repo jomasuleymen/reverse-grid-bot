@@ -1,10 +1,15 @@
 import ConfirmModal from '@/components/ConfirmModal'
 import DataTable from '@/components/DataTable'
 import { SERVICES } from '@/services'
-import { ITradingBotFilter, TradingBot, TradingBotState } from '@/services/trading-bot.service'
+import {
+  ITradingBotFilter,
+  TradePosition,
+  TradingBot,
+  TradingBotState,
+} from '@/services/trading-bot.service'
 import { formatDate } from '@/utils'
 import { useQueryClient } from '@tanstack/react-query'
-import { Space, Typography } from 'antd'
+import { Space, Tag, Typography } from 'antd'
 import { ColumnsType } from 'antd/es/table'
 import { BaseType } from 'antd/es/typography/Base'
 import React from 'react'
@@ -54,7 +59,7 @@ const parseDataSource = (data: TradingBot[]): ColumnType[] => {
   }))
 }
 
-const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
+const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
   {
     title: 'Аккаунт',
     dataIndex: 'exchange',
@@ -79,25 +84,29 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     title: 'Шаг сетки',
     dataIndex: 'gridStep',
     align: 'center',
+    width: '90px',
   },
   {
     title: 'Объем сетки',
     dataIndex: 'gridVolume',
     align: 'center',
-  },
-  {
-    title: 'Тейк-профит на сетке',
-    dataIndex: 'takeProfitOnGrid',
-    align: 'center',
+    width: '90px',
   },
   {
     title: 'Тейк-профит',
-    dataIndex: 'takeProfit',
     align: 'center',
     render: (value, record) => {
-      if (!value) return
-
-      return <span>{value + ' ' + record.quoteCurrency}</span>
+      return (
+        <div>
+          <span>{record.takeProfitOnGrid} - сетка</span>
+          {record.takeProfit && (
+            <>
+              <br />
+              <span> {record.takeProfit + ' ' + record.quoteCurrency}</span>
+            </>
+          )}
+        </div>
+      )
     },
   },
   {
@@ -119,6 +128,19 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     },
   },
   {
+    title: 'Позиция',
+    dataIndex: 'position',
+    align: 'center',
+    render(value) {
+      if (!value) return
+      return (
+        <Tag color={value === TradePosition.LONG ? 'green' : 'red'}>
+          {value === TradePosition.LONG ? 'LONG' : 'SHORT'}
+        </Tag>
+      )
+    },
+  },
+  {
     title: 'Статус',
     dataIndex: 'state',
     align: 'center',
@@ -127,9 +149,19 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
 
       return (
         <Text color="#00000" type={labelData.color} className={`text-${labelData.color}`}>
-          {labelData.label} {record.state === TradingBotState.Errored && `(${record.stopReason})`}
+          {labelData.label}
         </Text>
       )
+    },
+  },
+  {
+    title: 'Причина остановки',
+    dataIndex: 'state',
+    hidden: options?.isActive,
+    align: 'center',
+    width: '60px',
+    render: (_, record: ColumnType) => {
+      return <span>{record.stopReason && `(${record.stopReason})`}</span>
     },
   },
   {
@@ -170,7 +202,7 @@ const TradingBotsTable: React.FC<Props> = ({ options, queryKey }) => {
       fetchData={() => SERVICES.TRADING_BOT.fetchAll(options)}
       queryKey={queryKey}
       parseDataSource={parseDataSource}
-      columns={getColumns(queryKey)}
+      columns={getColumns(options)}
       refetchOnWindowFocus={true}
       refetchInterval={2000}
       shouldRefetch={() => {

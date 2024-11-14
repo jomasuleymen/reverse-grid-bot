@@ -28,6 +28,11 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     align: 'center',
   },
   {
+    title: 'Название аккаунта',
+    dataIndex: 'name',
+    align: 'center',
+  },
+  {
     title: 'Тип аккаунта',
     dataIndex: 'type',
     align: 'center',

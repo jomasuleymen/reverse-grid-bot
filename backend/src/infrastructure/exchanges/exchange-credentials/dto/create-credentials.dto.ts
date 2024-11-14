@@ -7,6 +7,9 @@ export class CreateCredentialsDto {
 	type: ExchangeCredentialsType;
 
 	@IsString()
+	name: string;
+
+	@IsString()
 	apiKey: string;
 
 	@IsString()

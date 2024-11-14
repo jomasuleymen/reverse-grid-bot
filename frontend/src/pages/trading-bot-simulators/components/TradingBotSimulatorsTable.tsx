@@ -106,32 +106,30 @@ type Props = {}
 
 function getExpandDetails(record: TradingBotSimulator) {
   const data = {
-    ID: record.id,
-    'Базовая валюта': record.baseCurrency,
-    'Котируемая валюта': record.quoteCurrency,
-    'Шаг сетки': record.gridStep,
-    'Объем сетки': record.gridVolume,
-    'Время начала': new Date(record.startTime).toLocaleString(),
-    'Время окончания': new Date(record.endTime).toLocaleString(),
-    Статус: record.status,
-    'Результат - Количество покупок': record.result.buyCount,
-    'Результат - Количество продаж': record.result.sellCount,
-    'Результат - Цена открытия': record.result.openPrice,
-    'Результат - Цена закрытия': record.result.closePrice,
-    'Результат - Наивысшая цена': record.result.highestPrice,
-    'Результат - Наименьшая цена': record.result.lowestPrice,
-    'Результат - Общая прибыль': record.result.totalProfit,
-    'Результат - Общая комиссия': record.result.totalFee,
-    'Результат - Реализованный PnL': record.result.realizedPnL,
-    'Результат - Нереализованный PnL': record.result.unrealizedPnL,
-    'Результат - PnL': record.result.PnL,
-    'Результат - Максимальный PnL': record.result.maxPnL,
-    'Дата создания': record.createdAt.toLocaleString(),
+    '------ Цена ------': '',
+    'Цена открытия': record.result.openPrice,
+    'Цена закрытия': record.result.closePrice,
+    'Наивысшая цена': record.result.highestPrice,
+    'Наименьшая цена': record.result.lowestPrice,
+    '------ Pnl ------': '',
+    PnL: record.result.PnL.toFixed(2) + ' ' + record.quoteCurrency,
+    'Максимальный PnL': record.result.maxPnL.toFixed(2) + ' ' + record.quoteCurrency,
+    'Нереализованный PnL': record.result.unrealizedPnL.toFixed(2) + ' ' + record.quoteCurrency,
+    'Реализованный PnL': record.result.realizedPnL.toFixed(2) + ' ' + record.quoteCurrency,
+    'Общая комиссия': record.result.totalFee.toFixed(2) + ' ' + record.quoteCurrency,
+    'Общая убытка': record.result.totalProfit.toFixed(2) + ' ' + record.quoteCurrency,
+    '------ Процессы ------': '',
+    'Количество покупок': record.result.buyCount,
+    'Количество продаж': record.result.sellCount,
   }
 
   return Object.entries(data).map(([key, value]) => (
     <div key={key}>
-      <b>{key}:</b> {value}
+      <b>
+        {key}
+        {value && ':'}
+      </b>{' '}
+      {value && value}
     </div>
   ))
 }

@@ -336,43 +336,6 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		this.marketData.currentPrice = lastPrice;
 	}
 
-	private async checkMissedTriggers() {
-		while (this.state === BotState.Idle) {
-			await sleep(100);
-		}
-
-		while (this.state === BotState.Running) {
-			const orders: CreateTradingBotOrder[] = [];
-
-			while (
-				this.marketData.currentPrice &&
-				this.shouldCreateMissedTrigger(this.marketData.currentPrice)
-			) {
-				const missedTriggerPrice = this.getMissedTriggerPrice();
-
-				orders.push({
-					side: this.TRIGGER_SIDE,
-					triggerPrice: missedTriggerPrice,
-					type: 'stop-order',
-					customId: this.getCustomOrderId(
-						OrderCreationType.TRIGGER,
-						missedTriggerPrice,
-					),
-					quantity: this.config.gridVolume,
-					symbol: this.symbol,
-				});
-
-				this.updateTriggerPrices(missedTriggerPrice);
-			}
-
-			if (orders.length) {
-				this.submitOrders(orders);
-			}
-
-			await sleep(50);
-		}
-	}
-
 	private updateTriggerPrices(price: number) {
 		this.triggerPrices.maxPrice = Math.max(
 			this.triggerPrices.maxPrice,
@@ -387,6 +350,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	private async closeAllPositions() {
 		let allQuantity = 0;
 		for (const order of this.orders) {
+			console.log(
+				order.side == this.TRIGGER_SIDE,
+				order,
+				this.TRIGGER_SIDE,
+			);
 			if (order.side == this.TRIGGER_SIDE) allQuantity += order.quantity;
 			else allQuantity -= order.quantity;
 		}
@@ -425,7 +393,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		const stopLossCount = this.getStopLossCount();
 		if (this.config.takeProfitOnGrid <= stopLossCount) {
-			this.stop();
+			this.stop({ reason: 'Тейк-профит на сетке' });
 		}
 	}
 
@@ -500,20 +468,63 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		return buyCount - sellCount;
 	}
 
+	private async checkMissedTriggers() {
+		while (this.state === BotState.Idle) {
+			await sleep(100);
+		}
+
+		while (this.state === BotState.Running) {
+			const orders: CreateTradingBotOrder[] = [];
+
+			while (
+				this.marketData.currentPrice &&
+				this.shouldCreateMissedTrigger(this.marketData.currentPrice)
+			) {
+				const missedTriggerPrice = this.getMissedTriggerPrice();
+
+				orders.push({
+					side: this.TRIGGER_SIDE,
+					triggerPrice: missedTriggerPrice,
+					type: 'stop-order',
+					customId: this.getCustomOrderId(
+						OrderCreationType.TRIGGER,
+						missedTriggerPrice,
+					),
+					quantity: this.config.gridVolume,
+					symbol: this.symbol,
+				});
+
+				this.updateTriggerPrices(missedTriggerPrice);
+			}
+
+			if (orders.length) {
+				this.submitOrders(orders);
+			}
+
+			await sleep(50);
+		}
+	}
+
+	private isTakeProfitTriggered() {
+		return this.config.position === TradePosition.LONG
+			? this.marketData.currentPrice >= this.config.takeProfit
+			: this.marketData.currentPrice <= this.config.takeProfit;
+	}
+
 	private async checkBotState() {
 		while (this.state === BotState.Idle) {
 			await sleep(100);
 		}
 
 		while (this.state === BotState.Running) {
-			if (this.marketData.currentPrice >= this.config.takeProfit) {
-				this.stop();
+			if (this.isTakeProfitTriggered()) {
+				this.stop({ reason: 'Тейк-профит' });
 				return;
 			}
 
 			const state = await this.callBacks.checkBotState();
 			if (state === BotState.Stopped || state === BotState.Stopping) {
-				this.stop();
+				this.stop({ reason: 'Ручная остановка' });
 				return;
 			}
 

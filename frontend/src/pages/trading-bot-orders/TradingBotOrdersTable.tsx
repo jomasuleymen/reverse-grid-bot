@@ -1,14 +1,17 @@
 import Block from '@/components/Block/Block'
-import DataTable from '@/components/DataTable'
 import { SERVICES } from '@/services'
-import { IBotSummary, TradingBotOrder, TradingOrderSide } from '@/services/trading-bot.service'
+import {
+  OrdersWithSummary,
+  OrderWithSummary,
+  TradingOrderSide,
+} from '@/services/trading-bot.service'
 import { formatDate } from '@/utils'
 import { useQuery } from '@tanstack/react-query'
 import { Descriptions, DescriptionsProps, Space, Spin, Tag } from 'antd'
-import { ColumnsType, ColumnType } from 'antd/es/table'
+import Table, { ColumnsType } from 'antd/es/table'
 import React, { memo } from 'react'
 
-const parseDataSource = (data: TradingBotOrder[]): ColumnType[] => {
+const parseDataSource = (data: OrderWithSummary[]): OrderWithSummary[] => {
   if (!data) return []
 
   return data.map((item) => ({
@@ -16,7 +19,8 @@ const parseDataSource = (data: TradingBotOrder[]): ColumnType[] => {
     ...item,
   }))
 }
-const getColumns = (config: Props['configs']): ColumnsType<TradingBotOrder> => [
+
+const getColumns = (config: Props['configs']): ColumnsType<OrderWithSummary> => [
   {
     title: '№',
     align: 'center',
@@ -103,14 +107,14 @@ const getColumns = (config: Props['configs']): ColumnsType<TradingBotOrder> => [
 ]
 
 const getDescriptionItems = (
-  data: IBotSummary,
+  data: OrdersWithSummary,
   config: Props['configs'],
 ): DescriptionsProps['items'] => [
   {
     label: 'PnL',
     children: (
       <span>
-        {data.pnl.PnL.toFixed(6)} {config.quoteCurrency}
+        {data.pnl.netPnl.toFixed(6)} {config.quoteCurrency}
       </span>
     ),
   },
@@ -118,7 +122,7 @@ const getDescriptionItems = (
     label: 'Нереализованная прибыль',
     children: (
       <span>
-        {data.pnl.unrealizedPnL.toFixed(6)} {config.quoteCurrency}
+        {data.pnl.unrealizedPnl.toFixed(6)} {config.quoteCurrency}
       </span>
     ),
   },
@@ -126,7 +130,7 @@ const getDescriptionItems = (
     label: 'Реализованная прибыль',
     children: (
       <span>
-        {data.pnl.realizedPnL.toFixed(6)} {config.quoteCurrency}
+        {data.pnl.realizedPnl.toFixed(6)} {config.quoteCurrency}
       </span>
     ),
   },
@@ -141,12 +145,12 @@ const getDescriptionItems = (
   },
   {
     label: 'Кол-во покупки (Buy)',
-    children: <span>{data.buyCount} шт</span>,
+    children: <span>{data.buyOrdersCount} шт</span>,
     span: 3,
   },
   {
     label: 'Кол-во продажи (Sell)',
-    children: <span>{data.sellCount} шт</span>,
+    children: <span>{data.sellOrdersCount} шт</span>,
     span: 3,
   },
 ]
@@ -159,18 +163,17 @@ type Props = {
   }
 }
 
-function getExpandDetails(record: TradingBotOrder, configs: Props['configs']) {
-  const summary = record.summary
-  if (!summary) return
+function getExpandDetails(record: OrderWithSummary, configs: Props['configs']) {
+  if (!record) return
 
   const data = {
-    PnL: summary.pnl.PnL.toFixed(2) + ' ' + configs.quoteCurrency,
-    'Нереализованная прибыль': summary.pnl.unrealizedPnL.toFixed(2) + ' ' + configs.quoteCurrency,
-    'Реализованная прибыль': summary.pnl.realizedPnL.toFixed(2) + ' ' + configs.quoteCurrency,
-    'Сумма комиссии': summary.pnl.fee.toFixed(2) + ' ' + configs.quoteCurrency,
-    Убыток: summary.pnl.totalProfit.toFixed(2) + ' ' + configs.quoteCurrency,
-    Покупки: summary.buyCount,
-    Продажи: summary.sellCount,
+    PnL: record.pnl.netPnl.toFixed(2) + ' ' + configs.quoteCurrency,
+    'Нереализованная прибыль': record.pnl.unrealizedPnl.toFixed(2) + ' ' + configs.quoteCurrency,
+    'Реализованная прибыль': record.pnl.realizedPnl.toFixed(2) + ' ' + configs.quoteCurrency,
+    'Сумма комиссии': record.pnl.fee.toFixed(2) + ' ' + configs.quoteCurrency,
+    Убыток: record.pnl.totalProfit.toFixed(2) + ' ' + configs.quoteCurrency,
+    Покупки: record.buyOrdersCount,
+    Продажи: record.sellOrdersCount,
   }
 
   return Object.entries(data).map(([key, value]) => (
@@ -181,15 +184,9 @@ function getExpandDetails(record: TradingBotOrder, configs: Props['configs']) {
 }
 
 const TradingBotOrdersTable: React.FC<Props> = ({ botId, configs }) => {
-  const queryKey = ['trading-bot-orders', botId.toString()]
-
-  const {
-    isPending,
-    isSuccess,
-    data: botSummary,
-  } = useQuery({
-    queryKey: ['trading-bot-summary', botId],
-    queryFn: () => SERVICES.TRADING_BOT.getBotSummary(botId!),
+  const { isPending, isSuccess, data } = useQuery({
+    queryKey: ['trading-bot-orders-with-summaries', botId],
+    queryFn: () => SERVICES.TRADING_BOT.ORDERS.getOrdersWithSummary(botId!),
     refetchOnWindowFocus: false,
   })
 
@@ -198,39 +195,38 @@ const TradingBotOrdersTable: React.FC<Props> = ({ botId, configs }) => {
       <Space direction="vertical" style={{ display: 'flex' }}>
         <Spin spinning={isPending}>
           <Descriptions
-            title="Подробная информация о ордера"
+            title="Подробная информация ордера"
             bordered
             size="small"
             rootClassName="w-fit"
             column={{ xs: 1, sm: 1, md: 2, lg: 3, xl: 3, xxl: 3 }}
-            items={botSummary && getDescriptionItems(botSummary, configs)}
+            items={data && getDescriptionItems(data, configs)}
           />
         </Spin>
-        <DataTable
-          fetchData={() => SERVICES.TRADING_BOT.ORDERS.fetchByBotId(botId)}
-          queryKey={queryKey}
-          parseDataSource={parseDataSource}
-          columns={getColumns(configs)}
-          refetchOnWindowFocus={true}
-          tableProps={{
-            size: 'middle',
-            rowClassName: (record) => {
-              if (record.summary?.isMaxPnl) {
-                return 'bg-green-50'
-              }
+        <Table<OrderWithSummary>
+          loading={isPending}
+          columns={getColumns(configs) as any}
+          dataSource={isSuccess ? parseDataSource(data.positions) : []}
+          pagination={false}
+          bordered={true}
+          scroll={{ x: 'max-content' }}
+          size="middle"
+          rowClassName={(record: OrderWithSummary) => {
+            if (record.isMaxPnl) {
+              return 'bg-green-50'
+            }
 
-              if (record.summary?.isMinPnl) {
-                return 'bg-red-50'
-              }
+            if (record.isMinPnl) {
+              return 'bg-red-50'
+            }
 
-              return ''
+            return ''
+          }}
+          expandable={{
+            rowExpandable: (record) => {
+              return !!record.pnl
             },
-            expandable: {
-              rowExpandable: (record) => {
-                return !!record.summary
-              },
-              expandedRowRender: (record) => getExpandDetails(record, configs),
-            },
+            expandedRowRender: (record) => getExpandDetails(record, configs),
           }}
         />
       </Space>

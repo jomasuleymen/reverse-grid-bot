@@ -12,7 +12,10 @@ import { TRADING_BOT_CREDENTIALS_QUERY_KEY } from '.'
 
 export type TCreateExchangeCredentialsForm = CreateExchangeCredentials
 
-export const ExchangeCredentialsFormItems: FormItemProps<TCreateExchangeCredentialsForm>[] = [
+export const ExchangeCredentialsFormItems: (
+  | FormItemProps<TCreateExchangeCredentialsForm>
+  | FormItemProps<TCreateExchangeCredentialsForm>[]
+)[] = [
   {
     label: 'Биржа',
     name: 'exchange',
@@ -25,18 +28,27 @@ export const ExchangeCredentialsFormItems: FormItemProps<TCreateExchangeCredenti
       </Select>
     ),
   },
-  {
-    label: 'Тип аккаунта',
-    name: 'type',
-    rules: [{ required: true }],
-    required: true,
-    children: (
-      <Select allowClear>
-        <Select.Option value={ExchangeCredentialsType.Testnet}>Тестовый режим</Select.Option>
-        <Select.Option value={ExchangeCredentialsType.Real}>Реальный счет</Select.Option>
-      </Select>
-    ),
-  },
+  [
+    {
+      label: 'Тип аккаунта',
+      name: 'type',
+      rules: [{ required: true }],
+      required: true,
+      children: (
+        <Select allowClear>
+          <Select.Option value={ExchangeCredentialsType.Testnet}>Тестовый режим</Select.Option>
+          <Select.Option value={ExchangeCredentialsType.Real}>Реальный счет</Select.Option>
+        </Select>
+      ),
+    },
+    {
+      label: 'Название аккаунта',
+      name: 'name',
+      rules: [{ required: true }],
+      required: true,
+      children: <Input />,
+    },
+  ],
   {
     label: 'Api key',
     name: 'apiKey',

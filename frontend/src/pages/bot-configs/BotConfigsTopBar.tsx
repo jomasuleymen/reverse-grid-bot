@@ -1,10 +1,10 @@
-import { Col, FormItemProps, Input, Radio, Row } from 'antd'
+import { Col, FormItemProps, Input, Row } from 'antd'
 import React from 'react'
 
 import CustomInputNumber from '@/components/CustomInputNumber'
 import UpsertModalForm from '@/components/UpsertModalForm'
 import { SERVICES } from '@/services'
-import { CreateTradingBotConfig, TradePosition } from '@/services/trading-bot.service'
+import { CreateTradingBotConfig } from '@/services/trading-bot.service'
 import { TRADING_BOT_CONFIGS_QUERY_KEY } from '.'
 
 export type TCreateTradingBotConfigForm = CreateTradingBotConfig
@@ -47,25 +47,6 @@ export const BotConfigFormItems: (FormItemType | FormItemType[])[] = [
     rules: [{ required: true }],
     required: true,
     children: <CustomInputNumber />,
-  },
-  {
-    label: 'Тейк-профит',
-    name: 'takeProfit',
-    rules: [{ required: true }],
-    required: true,
-    children: <CustomInputNumber />,
-  },
-  {
-    label: 'Позиция',
-    name: 'position',
-    rules: [{ required: true }],
-    required: true,
-    children: (
-      <Radio.Group defaultValue="Pear" optionType="button">
-        <Radio.Button value={TradePosition.LONG}>LONG</Radio.Button>
-        <Radio.Button value={TradePosition.SHORT}>SHORT</Radio.Button>
-      </Radio.Group>
-    ),
   },
 ]
 

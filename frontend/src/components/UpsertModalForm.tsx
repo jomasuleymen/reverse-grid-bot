@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Button, Col, Form, FormItemProps, Modal, Row, Space } from 'antd'
+import { Button, Col, Flex, Form, FormItemProps, Modal, Row } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 import ErrorDisplay from './ErrorDisplay'
 
@@ -104,9 +104,11 @@ function UpsertModalForm<TFormData extends Record<string, any>, TResponse, TErro
             style={{ maxWidth: 600 }}
             onFinish={onFinish}
           >
-            {formItems.map((item) =>
+            {formItems.map((item, idx) =>
               Array.isArray(item) ? (
-                <Space style={{ display: 'flex', width: '100%' }}>{item.map(getFormItem)}</Space>
+                <Flex gap={10} key={'items-' + idx}>
+                  {item.map(getFormItem)}
+                </Flex>
               ) : (
                 getFormItem(item)
               ),

@@ -1,7 +1,4 @@
-import {
-	ExchangeEnum,
-	OrderSide,
-} from '@/domain/interfaces/exchanges/common.interface';
+import { ExchangeEnum } from '@/domain/interfaces/exchanges/common.interface';
 import {
 	IStartTradingBotQueueData,
 	IStopTradingBotQueueData,
@@ -19,7 +16,6 @@ import { Queue } from 'bullmq';
 import { Equal, FindOptionsWhere, In, Or, Repository } from 'typeorm';
 import { ExchangeCredentialsService } from '../exchanges/exchange-credentials/exchange-credentials.service';
 import { QUEUES } from '../services/bull/bull.const';
-import { calculateOrdersPnL } from '../utils/trading-orders.util';
 import { BinanceSpotReverseGridBot } from './bots/binance/spot-reverse-grid-bot';
 import { BybitSpotReverseGridBot } from './bots/bybit/spot-reverse-grid-bot';
 import { GetTradingBotsDto } from './dto/get-bots.dto';
@@ -123,27 +119,6 @@ export class TradingBotService {
 		};
 
 		return this.tradingBotRepo.findOne({ where });
-	}
-
-	public async getBotSummary(botId: number) {
-		const bot = await this.tradingBotRepo.findOne({
-			where: { id: Equal(botId) },
-		});
-
-		if (!bot) throw new BadRequestException('Бот не найден');
-
-		const orders = await this.tradingBotOrdersService.findByBotId(botId);
-
-		const pnl = calculateOrdersPnL(orders);
-		const buyCount = orders.filter(
-			(order) => order.side === OrderSide.BUY,
-		).length;
-
-		return {
-			pnl,
-			buyCount,
-			sellCount: orders.length - buyCount,
-		};
 	}
 
 	public async update(botId: number, data: Partial<TradingBotEntity>) {

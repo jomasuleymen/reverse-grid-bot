@@ -15,6 +15,7 @@ export enum ExchangeEnum {
 
 export type ExchangeCredentials = {
   id: number
+  name: string
   type: ExchangeCredentialsType
   exchange: ExchangeEnum
 }

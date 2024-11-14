@@ -1,13 +1,17 @@
 import Block from '@/components/Block/Block'
+import CustomInputNumber from '@/components/CustomInputNumber'
 import ErrorDisplay from '@/components/ErrorDisplay'
 import { TRADING_BOT_CONFIGS_QUERY_KEY } from '@/pages/bot-configs'
-import { BotConfigFormItems } from '@/pages/bot-configs/BotConfigsTopBar'
+import {
+  BotConfigFormItems,
+  TCreateTradingBotConfigForm,
+} from '@/pages/bot-configs/BotConfigsTopBar'
 import { TRADING_BOT_CREDENTIALS_QUERY_KEY } from '@/pages/exchange-credentials'
 import { SERVICES } from '@/services'
 import { ExchangeCredentials } from '@/services/exchanges.service'
-import { IStartBotOptions, TradingBotConfig } from '@/services/trading-bot.service'
+import { IStartBotOptions, TradePosition, TradingBotConfig } from '@/services/trading-bot.service'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Col, Form, FormItemProps, Modal, Row, Select, Space } from 'antd'
+import { Alert, Button, Col, Flex, Form, FormItemProps, Modal, Radio, Row, Select } from 'antd'
 import React, { useState } from 'react'
 import { TRADING_BOTS_QUERY_KEY } from '..'
 
@@ -18,6 +22,31 @@ const tradingPrerequisitesMessages = [
   'Маржинальная ставка не превышает установленный предел',
   'Доступны необходимые разрешения для проведения маржинальных операций',
   'Пользователь подтвердил рискованность маржинальной торговли',
+]
+
+type FormItemType = FormItemProps<TCreateTradingBotConfigForm>
+
+const StartBotFormItems: (FormItemType | FormItemType[])[] = [
+  ...BotConfigFormItems,
+  {
+    label: 'Тейк-профит',
+    name: 'takeProfit',
+    rules: [{ required: true }],
+    required: true,
+    children: <CustomInputNumber />,
+  },
+  {
+    label: 'Позиция',
+    name: 'position',
+    rules: [{ required: true }],
+    required: true,
+    children: (
+      <Radio.Group defaultValue="Pear" optionType="button">
+        <Radio.Button value={TradePosition.LONG}>LONG</Radio.Button>
+        <Radio.Button value={TradePosition.SHORT}>SHORT</Radio.Button>
+      </Radio.Group>
+    ),
+  },
 ]
 
 const getFormItem = (item: FormItemProps) => {
@@ -77,7 +106,6 @@ const StartBotModal: React.FC = () => {
         gridStep: selectedConfig.gridStep,
         gridVolume: selectedConfig.gridVolume,
         takeProfitOnGrid: selectedConfig.takeProfitOnGrid,
-        takeProfit: selectedConfig.takeProfit,
       })
     }
   }
@@ -105,8 +133,6 @@ const StartBotModal: React.FC = () => {
       <b>Шаг сетки:</b> {config.gridStep + ' ' + config.quoteCurrency}
       <br />
       <b>Тейк-профит на сетке:</b> {config.takeProfitOnGrid}
-      <br />
-      <b>Тейк-профит:</b> {config.takeProfit && config.takeProfit + ' ' + config.quoteCurrency}
     </>
   )
 
@@ -152,11 +178,11 @@ const StartBotModal: React.FC = () => {
             ))}
           </Select>
 
-          {BotConfigFormItems.map((item, idx) =>
+          {StartBotFormItems.map((item, idx) =>
             Array.isArray(item) ? (
-              <Space style={{ display: 'flex', width: '100%' }} key={'items-' + idx}>
+              <Flex gap={10} key={'items-' + idx}>
                 {item.map(getFormItem)}
-              </Space>
+              </Flex>
             ) : (
               getFormItem(item)
             ),

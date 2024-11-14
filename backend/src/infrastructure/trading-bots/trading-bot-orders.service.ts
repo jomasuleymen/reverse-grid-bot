@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Equal, Repository } from 'typeorm';
-import { calculateOrdersPnL } from '../utils/trading-orders.util';
+import { calculatePositionsSummary } from '../utils/trading-orders.util';
 import { TradingBotOrdersEntity } from './entities/trading-bot-orders.entity';
 
 @Injectable()
@@ -11,13 +11,15 @@ export class TradingBotOrdersService {
 		private readonly botOrdersRepo: Repository<TradingBotOrdersEntity>,
 	) {}
 
+	public async getWithSummary(botId: number) {
+		const orders = await this.findByBotId(botId);
+		return calculatePositionsSummary(orders, { includeDetails: true });
+	}
+
 	async findByBotId(botId: number) {
 		const orders = await this.botOrdersRepo.find({
 			where: { botId: Equal(botId) },
 		});
-
-		calculateOrdersPnL(orders, { analyzeInDetails: true });
-
 		return orders;
 	}
 

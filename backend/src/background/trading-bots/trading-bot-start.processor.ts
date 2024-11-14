@@ -6,6 +6,7 @@ import LoggerService from '@/infrastructure/services/logger/logger.service';
 import TelegramService from '@/infrastructure/services/telegram/telegram.service';
 import { TradingBotOrdersService } from '@/infrastructure/trading-bots/trading-bot-orders.service';
 import { TradingBotService } from '@/infrastructure/trading-bots/trading-bots.service';
+import { calculatePositionsSummary } from '@/infrastructure/utils/trading-orders.util';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { BadRequestException } from '@nestjs/common';
 import { Job } from 'bullmq';
@@ -136,12 +137,12 @@ export class TradingBotStartConsumer extends WorkerHost {
 							triggerPrice: order.triggerPrice,
 						});
 
-						const summary =
-							await this.tradingBotService.getBotSummary(
-								botEntity.id,
-							);
+						const orders = await this.botOrdersService.findByBotId(
+							botEntity.id,
+						);
 
-						const { buyCount, sellCount, pnl } = summary;
+						const { pnl, buyOrdersCount, sellOrdersCount } =
+							calculatePositionsSummary(orders);
 
 						const message = `BYBIT
 					📈 **Информация об ордере**
@@ -150,15 +151,15 @@ export class TradingBotStartConsumer extends WorkerHost {
 					- Покупная цена: ${order.avgPrice}
 					
 					💰 **Доходность**
-					- PnL: ${pnl.PnL.toFixed(2)}
-					- Нереализованная прибыль: ${pnl.unrealizedPnL.toFixed(2)}
-					- Реализованная прибыль: ${pnl.realizedPnL.toFixed(2)}
+					- PnL: ${pnl.netPnl.toFixed(2)}
+					- Нереализованная прибыль: ${pnl.unrealizedPnl.toFixed(2)}
+					- Реализованная прибыль: ${pnl.realizedPnl.toFixed(2)}
 					- Убыток: ${pnl.totalProfit.toFixed(2)}
 					- Комиссия: ${pnl.fee.toFixed(2)}
 
 					🔄 **Общее количество операций**
-					- Покупки: ${buyCount}
-					- Продажи: ${sellCount}`;
+					- Покупки: ${buyOrdersCount}
+					- Продажи: ${sellOrdersCount}`;
 
 						await this.telegramService.sendMessage(userId, message);
 					},

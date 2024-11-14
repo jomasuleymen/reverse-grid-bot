@@ -53,6 +53,14 @@ export class TradingBotsController {
 		return await this.tradingBotOrdersService.findByBotId(+botId);
 	}
 
+	@Get('orders/:botId/summary')
+	async getOrdersWithSummary(
+		@UseSession() user: UserSession,
+		@Param('botId') botId: string,
+	) {
+		return await this.tradingBotOrdersService.getWithSummary(+botId);
+	}
+
 	@Get(':id')
 	async getBot(@Param('id') id: string, @UseSession() user: UserSession) {
 		const bot = await this.tradingBotService.findBotById(+id);
@@ -60,13 +68,5 @@ export class TradingBotsController {
 		if (!bot) throw new BadRequestException('Бот не найден');
 
 		return bot;
-	}
-
-	@Get(':id/summary')
-	async getBotSummary(
-		@UseSession() user: UserSession,
-		@Param('id') botId: string,
-	) {
-		return await this.tradingBotService.getBotSummary(+botId);
 	}
 }

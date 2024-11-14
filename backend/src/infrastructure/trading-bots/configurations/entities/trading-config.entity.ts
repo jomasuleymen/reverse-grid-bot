@@ -21,9 +21,6 @@ export class TradingBotConfigEntity {
 	@Column({ type: 'integer' })
 	takeProfitOnGrid: number;
 
-	@Column({ type: 'real', nullable: true })
-	takeProfit: number;
-
 	@Column({ type: 'real' })
 	gridStep: number;
 

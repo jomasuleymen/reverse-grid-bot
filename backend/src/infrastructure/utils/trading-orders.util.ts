@@ -1,171 +1,196 @@
 import { OrderSide } from '@/domain/interfaces/exchanges/common.interface';
 import { TradingBotOrder } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 
-type CalclatePnlOrderType = Pick<
+type CalculatePnlOrder = Pick<
 	TradingBotOrder,
 	'avgPrice' | 'side' | 'quantity' | 'fee'
 >;
 
-type Options = {
+interface IOptions {
 	currentPrice?: number;
-	analyzeInDetails?: boolean;
+	includeDetails?: boolean;
+}
+
+interface IStatistics {
+	maxPnl: number;
+	minPnl: number;
+}
+
+interface IPnl {
+	fee: number;
+	totalProfit: number;
+	realizedPnl: number;
+	unrealizedPnl: number;
+	netPnl: number;
+}
+
+type PositionSummary = {
+	pnl: IPnl;
+	statistics: IStatistics;
+	buyOrdersCount: number;
+	sellOrdersCount: number;
+	isMaxPnl?: boolean;
+	isMinPnl?: boolean;
 };
 
-export function calculateOrdersPnL(
-	orders: CalclatePnlOrderType[],
-	options: Options = {},
-) {
-	let { analyzeInDetails = false, currentPrice = 0 } = options;
+export type PostionsSummary<T> = PositionSummary & {
+	positions: (PositionSummary & T)[];
+};
 
-	const buyStack: CalclatePnlOrderType[] = []; // Track long positions
-	const sellStack: CalclatePnlOrderType[] = []; // Track short positions
-	let sellCount = 0;
-	let buyCount = 0;
+export function calculatePositionsSummary<T extends CalculatePnlOrder>(
+	orders: T[],
+	options: IOptions = {},
+): PostionsSummary<T> {
+	const { includeDetails: includePositions = false, currentPrice = 0 } =
+		options;
+
+	const positions: PostionsSummary<T>['positions'] = [];
+	const buyOrders: T[] = [];
+	const sellOrders: T[] = [];
+
+	let buyOrdersCount = 0;
+	let sellOrdersCount = 0;
 	let totalProfit = 0;
-	let fee = 0;
+	let totalFees = 0;
 
-	const statistics = {
-		maxUnrealizedPnl: Number.MIN_SAFE_INTEGER,
+	const statistics: IStatistics = {
 		maxPnl: Number.MIN_SAFE_INTEGER,
 		minPnl: Number.MAX_SAFE_INTEGER,
 	};
 
-	if (!currentPrice && orders.length) {
-		currentPrice = orders[orders.length - 1]!.avgPrice;
-	}
+	const effectiveCurrentPrice =
+		currentPrice ||
+		(orders.length ? orders[orders.length - 1]!.avgPrice : 0);
 
-	const processClosingOrders = (
-		stack: CalclatePnlOrderType[],
+	const closePositionOrders = (
+		stack: T[],
 		orderPrice: number,
 		orderQuantity: number,
-		isLong: boolean,
+		isLongPosition: boolean,
 	) => {
-		let positionSum = 0;
-		let quantitySum = 0;
+		let totalPositionValue = 0;
+		let totalClosedQuantity = 0;
 
-		while (quantitySum < orderQuantity && stack.length > 0) {
-			const lastOrder = stack.pop()!;
-			const closingQuantity = Math.min(
-				lastOrder.quantity,
-				orderQuantity - quantitySum,
+		while (totalClosedQuantity < orderQuantity && stack.length > 0) {
+			const positionOrder = stack.pop()!;
+			const closeQuantity = Math.min(
+				positionOrder.quantity,
+				orderQuantity - totalClosedQuantity,
 			);
 
-			positionSum += lastOrder.avgPrice * closingQuantity;
-			quantitySum += closingQuantity;
+			totalPositionValue += positionOrder.avgPrice * closeQuantity;
+			totalClosedQuantity += closeQuantity;
 
-			if (lastOrder.quantity > closingQuantity) {
-				lastOrder.quantity -= closingQuantity;
-				stack.push(lastOrder); // Push back with updated quantity if partially closed
+			if (positionOrder.quantity > closeQuantity) {
+				positionOrder.quantity -= closeQuantity;
+				stack.push(positionOrder);
 			}
 		}
 
-		if (quantitySum > 0) {
-			const avgPositionPrice = positionSum / quantitySum;
-			const pnl =
-				(isLong
-					? orderPrice - avgPositionPrice
-					: avgPositionPrice - orderPrice) * quantitySum;
-			totalProfit += pnl;
+		if (totalClosedQuantity > 0) {
+			const averagePositionPrice =
+				totalPositionValue / totalClosedQuantity;
+			const positionPnl =
+				(isLongPosition
+					? orderPrice - averagePositionPrice
+					: averagePositionPrice - orderPrice) * totalClosedQuantity;
+			totalProfit += positionPnl;
 		}
 	};
 
-	const calculateUnrealizedPnl = (price?: number) => {
-		price = price || currentPrice;
-
-		return (
-			buyStack.reduce(
-				(total, buyOrder) =>
-					total + (price - buyOrder.avgPrice) * buyOrder.quantity,
-				0,
-			) +
-			sellStack.reduce(
-				(total, sellOrder) =>
-					total + (sellOrder.avgPrice - price) * sellOrder.quantity,
-				0,
-			)
+	const calculateUnrealizedPnl = (
+		currentPrice: number = effectiveCurrentPrice,
+	) => {
+		const longUnrealizedPnl = buyOrders.reduce(
+			(acc, order) =>
+				acc + (currentPrice - order.avgPrice) * order.quantity,
+			0,
 		);
+
+		const shortUnrealizedPnl = sellOrders.reduce(
+			(acc, order) =>
+				acc + (order.avgPrice - currentPrice) * order.quantity,
+			0,
+		);
+
+		return longUnrealizedPnl + shortUnrealizedPnl;
 	};
 
 	orders.forEach((order) => {
 		if (order.side === OrderSide.BUY) {
-			buyCount++;
-			// If there are open short positions, attempt to close them with a buy order
-			if (sellStack.length > 0) {
-				processClosingOrders(
-					sellStack,
+			buyOrdersCount++;
+			if (sellOrders.length > 0) {
+				closePositionOrders(
+					sellOrders,
 					order.avgPrice,
 					order.quantity,
 					false,
 				);
 			} else {
-				buyStack.push(order); // Open new long position
+				buyOrders.push(order);
 			}
 		} else if (order.side === OrderSide.SELL) {
-			sellCount++;
-			// If there are open long positions, attempt to close them with a sell order
-			if (buyStack.length > 0) {
-				processClosingOrders(
-					buyStack,
+			sellOrdersCount++;
+			if (buyOrders.length > 0) {
+				closePositionOrders(
+					buyOrders,
 					order.avgPrice,
 					order.quantity,
 					true,
 				);
 			} else {
-				sellStack.push(order); // Open new short position
+				sellOrders.push(order);
 			}
 		}
 
-		fee -= order.fee;
+		totalFees -= order.fee;
 
-		const unrealizedPnL = calculateUnrealizedPnl(order.avgPrice);
-		const realizedPnL = totalProfit + fee;
-		const pnl = unrealizedPnL + realizedPnL;
+		const positionUnrealizedPnl = calculateUnrealizedPnl(order.avgPrice);
+		const positionRealizedPnl = totalProfit + totalFees;
+		const positionNetPnl = positionUnrealizedPnl + positionRealizedPnl;
 
-		statistics.maxUnrealizedPnl = Math.max(
-			pnl,
-			statistics.maxUnrealizedPnl,
-		);
-		statistics.minPnl = Math.min(pnl, statistics.minPnl);
-		statistics.maxPnl = Math.max(pnl, statistics.maxPnl);
+		statistics.minPnl = Math.min(positionNetPnl, statistics.minPnl);
+		statistics.maxPnl = Math.max(positionNetPnl, statistics.maxPnl);
 
-		if (analyzeInDetails) {
-			const data = {
+		if (includePositions) {
+			positions.push({
+				...order,
 				pnl: {
-					fee,
+					fee: totalFees,
 					totalProfit,
-					realizedPnL,
-					unrealizedPnL,
-					PnL: realizedPnL + unrealizedPnL,
+					realizedPnl: positionRealizedPnl,
+					unrealizedPnl: positionUnrealizedPnl,
+					netPnl: positionNetPnl,
 				},
 				statistics,
-				buyCount,
-				sellCount,
-			};
-
-			(order as any).summary = data;
+				buyOrdersCount,
+				sellOrdersCount,
+			});
 		}
 	});
 
-	if (analyzeInDetails) {
-		orders.forEach((order: any) => {
-			order.summary.isMaxUnrealizedPnl =
-				statistics.maxUnrealizedPnl == order.summary.pnl.unrealizedPnL;
-			order.summary.isMaxPnl = statistics.maxPnl == order.summary.pnl.PnL;
-			order.summary.isMinPnl = statistics.minPnl == order.summary.pnl.PnL;
+	if (includePositions) {
+		positions.forEach((position) => {
+			position.isMaxPnl = statistics.maxPnl === position.pnl.netPnl;
+			position.isMinPnl = statistics.minPnl === position.pnl.netPnl;
 		});
 	}
 
-	const unrealizedPnL = calculateUnrealizedPnl();
-	const realizedPnL = totalProfit + fee;
+	const unrealizedPnl = calculateUnrealizedPnl();
+	const realizedPnl = totalProfit + totalFees;
+	const netPnl = realizedPnl + unrealizedPnl;
 
 	return {
-		totalProfit,
-		fee,
-		realizedPnL,
-		unrealizedPnL,
-		PnL: realizedPnL + unrealizedPnL,
+		positions,
+		pnl: {
+			totalProfit,
+			fee: totalFees,
+			realizedPnl,
+			unrealizedPnl,
+			netPnl,
+		},
 		statistics,
-		buyCount,
-		sellCount,
+		buyOrdersCount,
+		sellOrdersCount,
 	};
 }

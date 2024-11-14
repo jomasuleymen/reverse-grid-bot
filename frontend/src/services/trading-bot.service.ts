@@ -59,7 +59,6 @@ export type TradingBotOrder = {
   symbol: string
   createdDate: Date
   botId: number
-  summary?: IBotSummary
 }
 
 const CONFIGS_API = {
@@ -80,14 +79,6 @@ const CONFIGS_API = {
   },
 }
 
-const ORDERS_API = {
-  async fetchByBotId(botId: string | number) {
-    return await $api
-      .get<TradingBotOrder[]>(TRADING_BOT_ORDERS_ENDPOINT + '/' + botId)
-      .then((res) => res.data)
-  },
-}
-
 export interface ITradingBotFilter {
   isActive?: boolean
 }
@@ -97,22 +88,46 @@ export interface IStartBotOptions {
   configId: number
 }
 
-export interface IBotSummary {
-  pnl: {
-    totalProfit: number
-    fee: number
-    realizedPnL: number
-    unrealizedPnL: number
-    PnL: number
-  }
-  statistics: {
-    maxUnrealizedPnl: number
-    maxPnl: number
-    minPnl: number
-  }
-  buyCount: number
-  sellCount: number
+interface IPnl {
+  fee: number
+  totalProfit: number
+  realizedPnl: number
+  unrealizedPnl: number
+  netPnl: number
+}
+
+interface IStatistics {
+  maxPnl: number
+  minPnl: number
+}
+
+interface IPositionSummary {
+  pnl: IPnl
+  statistics: IStatistics
+  buyOrdersCount: number
+  sellOrdersCount: number
   isMaxPnl?: boolean
+  isMinPnl?: boolean
+}
+
+export type OrderWithSummary = TradingBotOrder & IPositionSummary
+
+export type OrdersWithSummary = IPositionSummary & {
+  positions: OrderWithSummary[]
+}
+
+const ORDERS_API = {
+  async fetchByBotId(botId: string | number) {
+    return await $api
+      .get<TradingBotOrder[]>(TRADING_BOT_ORDERS_ENDPOINT + '/' + botId)
+      .then((res) => res.data)
+  },
+
+  async getOrdersWithSummary(botId: number | string) {
+    return await $api
+      .get<OrdersWithSummary>(`${TRADING_BOT_ORDERS_ENDPOINT}/${botId}/summary`)
+      .then((res) => res.data)
+  },
 }
 
 export const TRADING_BOT_API = {
@@ -127,12 +142,6 @@ export const TRADING_BOT_API = {
 
   async fetchById(botId: number | string) {
     return await $api.get<TradingBot>(`${TRADING_BOT_ENDPOINT}/${botId}`).then((res) => res.data)
-  },
-
-  async getBotSummary(botId: number | string) {
-    return await $api
-      .get<IBotSummary>(`${TRADING_BOT_ENDPOINT}/${botId}/summary`)
-      .then((res) => res.data)
   },
 
   async startBot(options: IStartBotOptions) {
