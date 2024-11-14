@@ -91,6 +91,16 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     align: 'center',
   },
   {
+    title: 'Тейк-профит',
+    dataIndex: 'takeProfit',
+    align: 'center',
+    render: (value, record) => {
+      if (!value) return
+
+      return <span>{value + ' ' + record.quoteCurrency}</span>
+    },
+  },
+  {
     title: 'Время открытия',
     dataIndex: 'createdAt',
     align: 'center',

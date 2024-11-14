@@ -26,6 +26,9 @@ export class StartBotDto {
 	takeProfitOnGrid: number;
 
 	@IsNumber()
+	takeProfit: number;
+
+	@IsNumber()
 	gridStep: number;
 
 	@IsNumber()

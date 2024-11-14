@@ -499,14 +499,23 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	private async checkBotState() {
-		while (true) {
+		while (this.state === BotState.Idle) {
+			await sleep(100);
+		}
+
+		while (this.state === BotState.Running) {
+			if (this.marketData.currentPrice >= this.config.takeProfit) {
+				this.stop();
+				return;
+			}
+
 			const state = await this.callBacks.checkBotState();
 			if (state === BotState.Stopped || state === BotState.Stopping) {
 				this.stop();
 				return;
 			}
 
-			await sleep(300);
+			await sleep(200);
 		}
 	}
 

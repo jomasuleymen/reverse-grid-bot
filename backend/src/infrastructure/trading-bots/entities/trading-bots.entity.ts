@@ -38,8 +38,11 @@ export class TradingBotEntity {
 	@Column()
 	quoteCurrency: string;
 
-	@Column({ type: 'real' })
+	@Column({ type: 'integer' })
 	takeProfitOnGrid: number;
+
+	@Column({ type: 'real', nullable: true })
+	takeProfit: number;
 
 	@Column({ type: 'real' })
 	gridStep: number;

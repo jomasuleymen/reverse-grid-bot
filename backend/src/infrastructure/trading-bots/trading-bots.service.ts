@@ -67,6 +67,7 @@ export class TradingBotService {
 			gridStep: options.gridStep,
 			gridVolume: options.gridVolume,
 			takeProfitOnGrid: options.takeProfitOnGrid,
+			takeProfit: options.takeProfit,
 			baseCurrency: options.baseCurrency,
 			quoteCurrency: options.quoteCurrency,
 			position: options.position,
@@ -128,9 +129,9 @@ export class TradingBotService {
 		const bot = await this.tradingBotRepo.findOne({
 			where: { id: Equal(botId) },
 		});
-		
+
 		if (!bot) throw new BadRequestException('Бот не найден');
-		
+
 		const orders = await this.tradingBotOrdersService.findByBotId(botId);
 
 		const pnl = calculateOrdersPnL(orders);

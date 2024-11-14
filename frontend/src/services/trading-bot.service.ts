@@ -13,6 +13,7 @@ export enum TradePosition {
 export type TradingBotConfig = {
   id: number
   takeProfitOnGrid: number
+  takeProfit: number
   gridStep: number
   gridVolume: number
   baseCurrency: string
@@ -58,6 +59,7 @@ export type TradingBotOrder = {
   symbol: string
   createdDate: Date
   botId: number
+  summary?: IBotSummary
 }
 
 const CONFIGS_API = {
@@ -103,8 +105,14 @@ export interface IBotSummary {
     unrealizedPnL: number
     PnL: number
   }
+  statistics: {
+    maxUnrealizedPnl: number
+    maxPnl: number
+    minPnl: number
+  }
   buyCount: number
   sellCount: number
+  isMaxPnl?: boolean
 }
 
 export const TRADING_BOT_API = {

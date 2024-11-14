@@ -115,7 +115,7 @@ const getDescriptionItems = (
     ),
   },
   {
-    label: 'Unrealized PnL',
+    label: 'Нереализованная прибыль',
     children: (
       <span>
         {data.pnl.unrealizedPnL.toFixed(6)} {config.quoteCurrency}
@@ -123,7 +123,7 @@ const getDescriptionItems = (
     ),
   },
   {
-    label: 'Realized PnL',
+    label: 'Реализованная прибыль',
     children: (
       <span>
         {data.pnl.realizedPnL.toFixed(6)} {config.quoteCurrency}
@@ -159,6 +159,27 @@ type Props = {
   }
 }
 
+function getExpandDetails(record: TradingBotOrder, configs: Props['configs']) {
+  const summary = record.summary
+  if (!summary) return
+
+  const data = {
+    PnL: summary.pnl.PnL.toFixed(2) + ' ' + configs.quoteCurrency,
+    'Нереализованная прибыль': summary.pnl.unrealizedPnL.toFixed(2) + ' ' + configs.quoteCurrency,
+    'Реализованная прибыль': summary.pnl.realizedPnL.toFixed(2) + ' ' + configs.quoteCurrency,
+    'Сумма комиссии': summary.pnl.fee.toFixed(2) + ' ' + configs.quoteCurrency,
+    Убыток: summary.pnl.totalProfit.toFixed(2) + ' ' + configs.quoteCurrency,
+    Покупки: summary.buyCount,
+    Продажи: summary.sellCount,
+  }
+
+  return Object.entries(data).map(([key, value]) => (
+    <div key={key}>
+      <b>{key}:</b> {value}
+    </div>
+  ))
+}
+
 const TradingBotOrdersTable: React.FC<Props> = ({ botId, configs }) => {
   const queryKey = ['trading-bot-orders', botId.toString()]
 
@@ -191,6 +212,26 @@ const TradingBotOrdersTable: React.FC<Props> = ({ botId, configs }) => {
           parseDataSource={parseDataSource}
           columns={getColumns(configs)}
           refetchOnWindowFocus={true}
+          tableProps={{
+            size: 'middle',
+            rowClassName: (record) => {
+              if (record.summary?.isMaxPnl) {
+                return 'bg-green-50'
+              }
+
+              if (record.summary?.isMinPnl) {
+                return 'bg-red-50'
+              }
+
+              return ''
+            },
+            expandable: {
+              rowExpandable: (record) => {
+                return !!record.summary
+              },
+              expandedRowRender: (record) => getExpandDetails(record, configs),
+            },
+          }}
         />
       </Space>
     </Block>

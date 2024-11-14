@@ -48,6 +48,7 @@ export interface ITradingBotConfig {
 	baseCurrency: string;
 	quoteCurrency: string;
 	takeProfitOnGrid: number;
+	takeProfit: number;
 	gridStep: number;
 	gridVolume: number;
 	position: TradePosition;

@@ -88,6 +88,7 @@ export class ReverseGridBotSimulateConsumer extends WorkerHost {
 				gridVolume,
 				gridStep,
 				takeProfitOnGrid: 0,
+				takeProfit: 0,
 				position: TradePosition.LONG,
 			},
 			startTime,

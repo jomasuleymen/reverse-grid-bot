@@ -51,6 +51,7 @@ export class TradingBotStartConsumer extends WorkerHost {
 					quoteCurrency: botEntity.quoteCurrency,
 					takeProfitOnGrid: botEntity.takeProfitOnGrid,
 					position: botEntity.position,
+					takeProfit: botEntity.takeProfit,
 				},
 				credentials,
 				callBacks: {
@@ -150,8 +151,8 @@ export class TradingBotStartConsumer extends WorkerHost {
 					
 					💰 **Доходность**
 					- PnL: ${pnl.PnL.toFixed(2)}
-					- Unrealized PnL: ${pnl.unrealizedPnL.toFixed(2)}
-					- Realized PnL: ${pnl.realizedPnL.toFixed(2)}
+					- Нереализованная прибыль: ${pnl.unrealizedPnL.toFixed(2)}
+					- Реализованная прибыль: ${pnl.realizedPnL.toFixed(2)}
 					- Убыток: ${pnl.totalProfit.toFixed(2)}
 					- Комиссия: ${pnl.fee.toFixed(2)}
 

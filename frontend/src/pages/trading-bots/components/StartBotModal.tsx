@@ -77,6 +77,7 @@ const StartBotModal: React.FC = () => {
         gridStep: selectedConfig.gridStep,
         gridVolume: selectedConfig.gridVolume,
         takeProfitOnGrid: selectedConfig.takeProfitOnGrid,
+        takeProfit: selectedConfig.takeProfit,
       })
     }
   }
@@ -103,7 +104,9 @@ const StartBotModal: React.FC = () => {
       <br />
       <b>Шаг сетки:</b> {config.gridStep + ' ' + config.quoteCurrency}
       <br />
-      <b>Тейк-профит на сетке:</b> {config.takeProfitOnGrid + ' ' + config.quoteCurrency}
+      <b>Тейк-профит на сетке:</b> {config.takeProfitOnGrid}
+      <br />
+      <b>Тейк-профит:</b> {config.takeProfit && config.takeProfit + ' ' + config.quoteCurrency}
     </>
   )
 

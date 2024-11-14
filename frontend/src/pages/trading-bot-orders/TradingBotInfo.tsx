@@ -36,6 +36,11 @@ const getDescriptionItems = (bot: TradingBot): DescriptionsProps['items'] => [
     children: `${bot.gridStep.toString()} ${bot.quoteCurrency}`,
   },
   {
+    label: ' Тейк-профит',
+    children: bot.takeProfit && `${bot.takeProfit} ${bot.quoteCurrency}`,
+    span: 2,
+  },
+  {
     label: ' Тейк-профит на сетке',
     children: `${bot.takeProfitOnGrid}`,
     span: 2,
