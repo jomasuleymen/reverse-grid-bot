@@ -32,6 +32,9 @@ export class TradingBotEntity {
 	@Column({ type: 'text' })
 	exchange: ExchangeEnum;
 
+	@Column({ nullable: true })
+	name: string;
+
 	@Column()
 	baseCurrency: string;
 
@@ -60,6 +63,10 @@ export class TradingBotEntity {
 	@Index()
 	@Column()
 	userId: number;
+
+	@Index()
+	@Column({ nullable: true })
+	proxyId: number;
 
 	@Index()
 	@Column({ nullable: true })

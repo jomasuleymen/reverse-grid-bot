@@ -1,5 +1,6 @@
+import { BotState } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
 
 export class GetTradingBotsDto {
 	@IsOptional()
@@ -10,4 +11,8 @@ export class GetTradingBotsDto {
 		return value;
 	})
 	isActive?: boolean;
+
+	@IsOptional()
+	@IsEnum(BotState)
+	state?: BotState;
 }

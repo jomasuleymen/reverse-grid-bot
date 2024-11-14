@@ -1,4 +1,5 @@
 import { ExchangeEnum, OrderSide } from '../exchanges/common.interface';
+import { IProxy } from '../proxy.interface';
 import { WalletBalance } from './wallet.interface';
 
 export type TradingBotOrder = {
@@ -74,6 +75,7 @@ export enum BotState {
 export interface IStartReverseBotOptions {
 	config: ITradingBotConfig;
 	credentials: IExchangeCredentials;
+	proxy?: IProxy;
 	callBacks: {
 		checkBotState: () => Promise<BotState>;
 		onNewOrder: (order: TradingBotOrder) => Promise<void>;

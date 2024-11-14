@@ -1,4 +1,5 @@
 import { OrderSide } from '@/domain/interfaces/exchanges/common.interface';
+import { IProxy } from '@/domain/interfaces/proxy.interface';
 import {
 	BotState,
 	CreateTradingBotOrder,
@@ -24,6 +25,7 @@ type TradingBotState = BotState.Idle | BotState.Running | BotState.Stopped;
 @Injectable({ scope: Scope.TRANSIENT })
 export abstract class BaseReverseGridBot implements ITradingBot {
 	protected config: ITradingBotConfig;
+	protected proxy?: IProxy;
 	protected credentials: IExchangeCredentials;
 	protected symbol: string;
 
@@ -64,9 +66,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	> = {};
 
 	private isMadeFirstOrder: boolean = false;
+	private isCleanedUp: boolean = false;
 
 	public async start(options: IStartReverseBotOptions): Promise<void> {
 		this.config = options.config;
+		this.proxy = options.proxy;
 		this.credentials = options.credentials;
 		this.callBacks = options.callBacks;
 		this.symbol = this.getSymbol(
@@ -146,16 +150,24 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			this.snapshots.end.walletBalance.coins.find(
 				(coin) => coin.coin === this.config.baseCurrency,
 			);
-
-			await this.closeAllPositions();
 		} catch (err) {
 			this.logger.error('error while stopping bot', err);
 		} finally {
-			setTimeout(() => this.cleanUp(), 10_000);
+			const sentLastTrade = await this.closeAllPositions().catch(
+				() => false,
+			);
+			if (sentLastTrade) {
+				setTimeout(() => this.cleanUp(), 10_000);
+			} else {
+				this.cleanUp();
+			}
 		}
 	}
 
 	private async cleanUp() {
+		if (this.isCleanedUp) return;
+		this.isCleanedUp = true;
+
 		this.callBacks.onStateUpdate(BotState.Stopped, {
 			snapshots: this.snapshots,
 		});
@@ -350,11 +362,6 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	private async closeAllPositions() {
 		let allQuantity = 0;
 		for (const order of this.orders) {
-			console.log(
-				order.side == this.TRIGGER_SIDE,
-				order,
-				this.TRIGGER_SIDE,
-			);
 			if (order.side == this.TRIGGER_SIDE) allQuantity += order.quantity;
 			else allQuantity -= order.quantity;
 		}
@@ -384,7 +391,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 					);
 				}
 			});
+
+			return true;
 		}
+
+		return false;
 	}
 
 	protected addNewOrder(order: TradingBotOrder) {
@@ -506,18 +517,18 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	private isTakeProfitTriggered() {
+		if (!this.marketData.currentPrice) return false;
 		return this.config.position === TradePosition.LONG
 			? this.marketData.currentPrice >= this.config.takeProfit
 			: this.marketData.currentPrice <= this.config.takeProfit;
 	}
 
 	private async checkBotState() {
-		while (this.state === BotState.Idle) {
-			await sleep(100);
-		}
-
-		while (this.state === BotState.Running) {
-			if (this.isTakeProfitTriggered()) {
+		while (true) {
+			if (
+				this.state === BotState.Running &&
+				this.isTakeProfitTriggered()
+			) {
 				this.stop({ reason: 'Тейк-профит' });
 				return;
 			}
@@ -528,7 +539,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				return;
 			}
 
-			await sleep(200);
+			await sleep(150);
 		}
 	}
 

@@ -68,6 +68,8 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
       return (
         <span>
           {value} ({record.type})
+          <br />
+          {record.name}
         </span>
       )
     },
@@ -161,7 +163,7 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
     align: 'center',
     width: '60px',
     render: (_, record: ColumnType) => {
-      return <span>{record.stopReason && `(${record.stopReason})`}</span>
+      return <span>{record.stopReason && `${record.stopReason}`}</span>
     },
   },
   {
@@ -216,7 +218,9 @@ const TradingBotsTable: React.FC<Props> = ({ options, queryKey }) => {
         return (
           data.findIndex(
             (bot) =>
-              bot.state === TradingBotState.Initializing || bot.state === TradingBotState.Stopping,
+              bot.state === TradingBotState.Idle ||
+              bot.state === TradingBotState.Initializing ||
+              bot.state === TradingBotState.Stopping,
           ) !== -1
         )
       }}

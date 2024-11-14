@@ -14,7 +14,9 @@ import {
 	WalletBalanceV5,
 	WebsocketClient,
 } from 'bybit-api';
+import { Agent } from 'http';
 import { SECOND } from 'time-constants';
+import * as tunnel from 'tunnel';
 import { BaseReverseGridBot } from '../common/base-reverse-grid-bot';
 
 @Injectable({ scope: Scope.TRANSIENT })
@@ -22,9 +24,9 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	private restClient: RestClientV5;
 	private wsClient: WebsocketClient;
 
-	private publicWsClient: WebsocketClient;
-
 	private readonly accountType: WalletBalanceV5['accountType'] = 'UNIFIED';
+
+	private readonly handlers: Record<string, (...args: any[]) => void> = {};
 
 	constructor(private readonly bybitService: BybitService) {
 		super();
@@ -34,40 +36,55 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		const isTestnet =
 			this.credentials.type == ExchangeCredentialsType.Testnet;
 
-		this.restClient = new RestClientV5({
-			key: this.credentials.apiKey,
-			secret: this.credentials.apiSecret,
-			demoTrading: isTestnet,
-			recv_window: 10 * SECOND,
-		});
+		let httpsAgent: Agent | undefined;
+
+		if (this.proxy) {
+			httpsAgent = tunnel.httpsOverHttp({
+				proxy: {
+					host: this.proxy.ip,
+					port: this.proxy.port.http,
+					proxyAuth: `${this.proxy.login}:${this.proxy.password}`,
+				},
+			});
+		}
+
+		this.restClient = new RestClientV5(
+			{
+				key: this.credentials.apiKey,
+				secret: this.credentials.apiSecret,
+				demoTrading: isTestnet,
+				recv_window: 10 * SECOND,
+			},
+			{
+				httpsAgent,
+			},
+		);
 
 		this.wsClient = new WebsocketClient({
 			key: this.credentials.apiKey,
 			secret: this.credentials.apiSecret,
 			market: 'v5',
 			demoTrading: isTestnet,
-		});
-
-		this.publicWsClient = new WebsocketClient({
-			market: 'v5',
+			requestOptions: {
+				httpsAgent,
+			},
 		});
 	}
 
 	protected async init() {
 		this.configureWsEmits();
-
-		this.wsClient.subscribeV5('order', 'spot');
-		this.publicWsClient.subscribeV5(`tickers.${this.symbol}`, 'spot');
 	}
 
 	private configureWsEmits() {
-		this.publicWsClient.on('update', (data) => {
-			if (!data) return;
-
+		this.wsClient.subscribeV5('order', 'spot');
+		const handler = (data: any) => {
 			if (data.topic === `tickers.${this.symbol}` && data.data) {
 				this.updateLastPrice(Number(data.data.lastPrice));
 			}
-		});
+		};
+
+		this.handlers[`tickers.${this.symbol}`] = handler;
+		this.bybitService.subscribe(`tickers.${this.symbol}`, handler);
 
 		this.wsClient.on('update', async (data) => {
 			if (!data) return;
@@ -94,15 +111,15 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		});
 
 		this.wsClient.on('open', () => {
-			this.logger.info('WS OPENED');
+			this.logger.info('Bybit private ws OPENED');
 		});
 
 		this.wsClient.on('reconnect', (data) => {
-			this.logger.info('ws reconnecting.... ');
+			this.logger.info('Bybit private ws reconnecting.... ');
 		});
 
 		this.wsClient.on('reconnected', (data) => {
-			this.logger.info('ws reconnected ');
+			this.logger.info('Bybit private ws reconnected ');
 		});
 	}
 
@@ -111,10 +128,12 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			this.restClient.cancelAllOrders({
 				category: 'spot',
 				orderFilter: 'StopOrder',
+				symbol: this.symbol,
 			}),
 			this.restClient.cancelAllOrders({
 				category: 'spot',
 				orderFilter: 'tpslOrder',
+				symbol: this.symbol,
 			}),
 		]).then((res) => {
 			this.logger.info('stop.cancelAllOrders', res);
@@ -125,17 +144,15 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		if (this.wsClient) {
 			this.wsClient.closeAll(true);
 			this.wsClient.removeAllListeners();
+			// @ts-ignore
+			this.wsClient = null;
 		}
 
-		if (this.publicWsClient) {
-			this.publicWsClient.closeAll(true);
-			this.publicWsClient.removeAllListeners();
-		}
+		const handler = this.handlers[`tickers.${this.symbol}`];
 
-		// @ts-ignore
-		this.wsClient = null;
-		// @ts-ignore
-		this.publicWsClient = null;
+		if (handler) {
+			this.bybitService.unsubscribe(`tickers.${this.symbol}`, handler);
+		}
 	}
 
 	protected async getWalletBalance(): Promise<WalletBalance> {

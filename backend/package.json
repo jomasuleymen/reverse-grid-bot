@@ -17,7 +17,7 @@
     "migration:generate:service": "npm run typeorm ./databases/service/ormconfig.ts -p migration:generate src/infrastructure/migrations/service/service",
     "migration:run": "npm run typeorm ./databases/main/ormconfig.ts migration:run",
     "migration:run:service": "npm run typeorm ./databases/service/ormconfig.ts migration:run",
-    "migration:revert": "npm run typeorm migration:revert",
+    "migration:revert": "npm run typeorm ./databases/main/ormconfig.ts migration:revert",
     "schema:drop": "npm run typeorm schema:drop"
   },
   "dependencies": {
@@ -59,6 +59,7 @@
     "set-interval-async": "^3.0.3",
     "sleep-promise": "^9.1.0",
     "time-constants": "^1.0.3",
+    "tunnel": "^0.0.6",
     "typeorm": "^0.3.20",
     "typeorm-naming-strategies": "^4.1.0"
   },
@@ -73,6 +74,7 @@
     "@types/node": "^22.9.0",
     "@types/node-telegram-bot-api": "^0.64.7",
     "@types/passport": "^1.0.17",
+    "@types/tunnel": "^0.0.7",
     "prettier": "^3.3.3",
     "source-map-support": "^0.5.21",
     "ts-loader": "^9.5.1",
