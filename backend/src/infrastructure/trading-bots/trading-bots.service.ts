@@ -13,7 +13,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { Equal, FindOptionsWhere, In, Or, Repository } from 'typeorm';
+import { Equal, FindOptionsWhere, Or, Repository } from 'typeorm';
 import { ExchangeCredentialsService } from '../exchanges/exchange-credentials/exchange-credentials.service';
 import { QUEUES } from '../services/bull/bull.const';
 import { BinanceSpotReverseGridBot } from './bots/binance/spot-reverse-grid-bot';
@@ -43,24 +43,12 @@ export class TradingBotService {
 			options.credentialsId,
 		);
 
-		// TODO: check by proxy
-		// const activeBot = await this.tradingBotRepo.findOneBy({
-		// 	userId,
-		// 	state: In([
-		// 		BotState.Running,
-		// 		BotState.Idle,
-		// 		BotState.Initializing,
-		// 		BotState.Stopping,
-		// 	]),
-		// });
-
-		// if (activeBot) throw new BadRequestException('У вас есть активный бот');
-
 		const botEntity = await this.save({
 			userId: userId,
 			credentialsId: credentials.id,
 			exchange: credentials.exchange,
 			type: credentials.type,
+			name: credentials.name,
 			gridStep: options.gridStep,
 			gridVolume: options.gridVolume,
 			takeProfitOnGrid: options.takeProfitOnGrid,
@@ -98,18 +86,27 @@ export class TradingBotService {
 	public async findBotsByUserId(userId: number, payload?: GetTradingBotsDto) {
 		const where: FindOptionsWhere<TradingBotEntity> = {
 			userId: Equal(userId),
-			state:
-				payload?.isActive === undefined
-					? undefined
-					: payload.isActive
-						? Or(
-								Equal(BotState.Idle),
-								Equal(BotState.Initializing),
-								Equal(BotState.Running),
-								Equal(BotState.Stopping),
-							)
-						: Or(Equal(BotState.Stopped), Equal(BotState.Errored)),
 		};
+
+		if (payload) {
+			if (payload.isActive === false) {
+				where.state = Or(
+					Equal(BotState.Stopped),
+					Equal(BotState.Errored),
+				);
+			} else if (payload.isActive === true) {
+				where.state = Or(
+					Equal(BotState.Idle),
+					Equal(BotState.Initializing),
+					Equal(BotState.Running),
+					Equal(BotState.Stopping),
+				);
+			}
+
+			if (payload.state) {
+				where.state = Equal(payload.state);
+			}
+		}
 
 		return this.tradingBotRepo.find({ where, order: { id: 'DESC' } });
 	}

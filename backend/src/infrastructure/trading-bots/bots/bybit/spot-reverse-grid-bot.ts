@@ -14,7 +14,9 @@ import {
 	WalletBalanceV5,
 	WebsocketClient,
 } from 'bybit-api';
+import { Agent } from 'http';
 import { SECOND } from 'time-constants';
+import * as tunnel from 'tunnel';
 import { BaseReverseGridBot } from '../common/base-reverse-grid-bot';
 
 @Injectable({ scope: Scope.TRANSIENT })
@@ -34,18 +36,38 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		const isTestnet =
 			this.credentials.type == ExchangeCredentialsType.Testnet;
 
-		this.restClient = new RestClientV5({
-			key: this.credentials.apiKey,
-			secret: this.credentials.apiSecret,
-			demoTrading: isTestnet,
-			recv_window: 10 * SECOND,
-		});
+		let httpsAgent: Agent | undefined;
+
+		if (this.proxy) {
+			httpsAgent = tunnel.httpsOverHttp({
+				proxy: {
+					host: this.proxy.ip,
+					port: this.proxy.port.http,
+					proxyAuth: `${this.proxy.login}:${this.proxy.password}`,
+				},
+			});
+		}
+
+		this.restClient = new RestClientV5(
+			{
+				key: this.credentials.apiKey,
+				secret: this.credentials.apiSecret,
+				demoTrading: isTestnet,
+				recv_window: 10 * SECOND,
+			},
+			{
+				httpsAgent,
+			},
+		);
 
 		this.wsClient = new WebsocketClient({
 			key: this.credentials.apiKey,
 			secret: this.credentials.apiSecret,
 			market: 'v5',
 			demoTrading: isTestnet,
+			requestOptions: {
+				httpsAgent,
+			},
 		});
 	}
 

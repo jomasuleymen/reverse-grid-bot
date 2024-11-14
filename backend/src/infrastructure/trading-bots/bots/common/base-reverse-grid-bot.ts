@@ -1,4 +1,5 @@
 import { OrderSide } from '@/domain/interfaces/exchanges/common.interface';
+import { IProxy } from '@/domain/interfaces/proxy.interface';
 import {
 	BotState,
 	CreateTradingBotOrder,
@@ -24,6 +25,7 @@ type TradingBotState = BotState.Idle | BotState.Running | BotState.Stopped;
 @Injectable({ scope: Scope.TRANSIENT })
 export abstract class BaseReverseGridBot implements ITradingBot {
 	protected config: ITradingBotConfig;
+	protected proxy?: IProxy;
 	protected credentials: IExchangeCredentials;
 	protected symbol: string;
 
@@ -68,6 +70,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 	public async start(options: IStartReverseBotOptions): Promise<void> {
 		this.config = options.config;
+		this.proxy = options.proxy;
 		this.credentials = options.credentials;
 		this.callBacks = options.callBacks;
 		this.symbol = this.getSymbol(
@@ -521,12 +524,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	private async checkBotState() {
-		while (this.state === BotState.Idle) {
-			await sleep(100);
-		}
-
-		while (this.state === BotState.Running) {
-			if (this.isTakeProfitTriggered()) {
+		while (true) {
+			if (
+				this.state === BotState.Running &&
+				this.isTakeProfitTriggered()
+			) {
 				this.stop({ reason: 'Тейк-профит' });
 				return;
 			}
@@ -537,7 +539,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				return;
 			}
 
-			await sleep(200);
+			await sleep(150);
 		}
 	}
 
