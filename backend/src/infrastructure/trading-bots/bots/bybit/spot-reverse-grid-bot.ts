@@ -22,9 +22,9 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 	private restClient: RestClientV5;
 	private wsClient: WebsocketClient;
 
-	private publicWsClient: WebsocketClient;
-
 	private readonly accountType: WalletBalanceV5['accountType'] = 'UNIFIED';
+
+	private readonly handlers: Record<string, (...args: any[]) => void> = {};
 
 	constructor(private readonly bybitService: BybitService) {
 		super();
@@ -47,27 +47,22 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			market: 'v5',
 			demoTrading: isTestnet,
 		});
-
-		this.publicWsClient = new WebsocketClient({
-			market: 'v5',
-		});
 	}
 
 	protected async init() {
 		this.configureWsEmits();
-
-		this.wsClient.subscribeV5('order', 'spot');
-		this.publicWsClient.subscribeV5(`tickers.${this.symbol}`, 'spot');
 	}
 
 	private configureWsEmits() {
-		this.publicWsClient.on('update', (data) => {
-			if (!data) return;
-
+		this.wsClient.subscribeV5('order', 'spot');
+		const handler = (data: any) => {
 			if (data.topic === `tickers.${this.symbol}` && data.data) {
 				this.updateLastPrice(Number(data.data.lastPrice));
 			}
-		});
+		};
+
+		this.handlers[`tickers.${this.symbol}`] = handler;
+		this.bybitService.subscribe(`tickers.${this.symbol}`, handler);
 
 		this.wsClient.on('update', async (data) => {
 			if (!data) return;
@@ -94,15 +89,15 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		});
 
 		this.wsClient.on('open', () => {
-			this.logger.info('WS OPENED');
+			this.logger.info('Bybit private ws OPENED');
 		});
 
 		this.wsClient.on('reconnect', (data) => {
-			this.logger.info('ws reconnecting.... ');
+			this.logger.info('Bybit private ws reconnecting.... ');
 		});
 
 		this.wsClient.on('reconnected', (data) => {
-			this.logger.info('ws reconnected ');
+			this.logger.info('Bybit private ws reconnected ');
 		});
 	}
 
@@ -125,17 +120,15 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		if (this.wsClient) {
 			this.wsClient.closeAll(true);
 			this.wsClient.removeAllListeners();
+			// @ts-ignore
+			this.wsClient = null;
 		}
 
-		if (this.publicWsClient) {
-			this.publicWsClient.closeAll(true);
-			this.publicWsClient.removeAllListeners();
-		}
+		const handler = this.handlers[`tickers.${this.symbol}`];
 
-		// @ts-ignore
-		this.wsClient = null;
-		// @ts-ignore
-		this.publicWsClient = null;
+		if (handler) {
+			this.bybitService.unsubscribe(`tickers.${this.symbol}`, handler);
+		}
 	}
 
 	protected async getWalletBalance(): Promise<WalletBalance> {

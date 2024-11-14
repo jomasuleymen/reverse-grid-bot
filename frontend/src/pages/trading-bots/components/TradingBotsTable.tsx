@@ -161,7 +161,7 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
     align: 'center',
     width: '60px',
     render: (_, record: ColumnType) => {
-      return <span>{record.stopReason && `(${record.stopReason})`}</span>
+      return <span>{record.stopReason && `${record.stopReason}`}</span>
     },
   },
   {

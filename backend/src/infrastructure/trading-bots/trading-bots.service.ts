@@ -43,17 +43,18 @@ export class TradingBotService {
 			options.credentialsId,
 		);
 
-		const activeBot = await this.tradingBotRepo.findOneBy({
-			userId,
-			state: In([
-				BotState.Running,
-				BotState.Idle,
-				BotState.Initializing,
-				BotState.Stopping,
-			]),
-		});
+		// TODO: check by proxy
+		// const activeBot = await this.tradingBotRepo.findOneBy({
+		// 	userId,
+		// 	state: In([
+		// 		BotState.Running,
+		// 		BotState.Idle,
+		// 		BotState.Initializing,
+		// 		BotState.Stopping,
+		// 	]),
+		// });
 
-		if (activeBot) throw new BadRequestException('У вас есть активный бот');
+		// if (activeBot) throw new BadRequestException('У вас есть активный бот');
 
 		const botEntity = await this.save({
 			userId: userId,

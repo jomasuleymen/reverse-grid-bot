@@ -64,6 +64,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	> = {};
 
 	private isMadeFirstOrder: boolean = false;
+	private isCleanedUp: boolean = false;
 
 	public async start(options: IStartReverseBotOptions): Promise<void> {
 		this.config = options.config;
@@ -146,16 +147,24 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			this.snapshots.end.walletBalance.coins.find(
 				(coin) => coin.coin === this.config.baseCurrency,
 			);
-
-			await this.closeAllPositions();
 		} catch (err) {
 			this.logger.error('error while stopping bot', err);
 		} finally {
-			setTimeout(() => this.cleanUp(), 10_000);
+			const sentLastTrade = await this.closeAllPositions().catch(
+				() => false,
+			);
+			if (sentLastTrade) {
+				setTimeout(() => this.cleanUp(), 10_000);
+			} else {
+				this.cleanUp();
+			}
 		}
 	}
 
 	private async cleanUp() {
+		if (this.isCleanedUp) return;
+		this.isCleanedUp = true;
+
 		this.callBacks.onStateUpdate(BotState.Stopped, {
 			snapshots: this.snapshots,
 		});
@@ -384,7 +393,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 					);
 				}
 			});
+
+			return true;
 		}
+
+		return false;
 	}
 
 	protected addNewOrder(order: TradingBotOrder) {
@@ -506,6 +519,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	private isTakeProfitTriggered() {
+		if (!this.marketData.currentPrice) return false;
 		return this.config.position === TradePosition.LONG
 			? this.marketData.currentPrice >= this.config.takeProfit
 			: this.marketData.currentPrice <= this.config.takeProfit;
