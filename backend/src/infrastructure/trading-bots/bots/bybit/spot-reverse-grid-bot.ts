@@ -106,10 +106,12 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			this.restClient.cancelAllOrders({
 				category: 'spot',
 				orderFilter: 'StopOrder',
+				symbol: this.symbol,
 			}),
 			this.restClient.cancelAllOrders({
 				category: 'spot',
 				orderFilter: 'tpslOrder',
+				symbol: this.symbol,
 			}),
 		]).then((res) => {
 			this.logger.info('stop.cancelAllOrders', res);

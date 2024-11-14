@@ -359,11 +359,6 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	private async closeAllPositions() {
 		let allQuantity = 0;
 		for (const order of this.orders) {
-			console.log(
-				order.side == this.TRIGGER_SIDE,
-				order,
-				this.TRIGGER_SIDE,
-			);
 			if (order.side == this.TRIGGER_SIDE) allQuantity += order.quantity;
 			else allQuantity -= order.quantity;
 		}
