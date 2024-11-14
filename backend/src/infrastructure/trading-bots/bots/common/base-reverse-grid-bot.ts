@@ -387,9 +387,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	private async closeAllPositions() {
 		let allQuantity = 0;
 		for (const order of this.orders) {
-			if (order.side === this.TRIGGER_SIDE) allQuantity += order.quantity;
+			if (order.side == this.TRIGGER_SIDE) allQuantity += order.quantity;
 			else allQuantity -= order.quantity;
 		}
+
+		this.logger.info('closeAllPositions', { allQuantity });
 
 		if (allQuantity > 0) {
 			await this.submitOrders({
