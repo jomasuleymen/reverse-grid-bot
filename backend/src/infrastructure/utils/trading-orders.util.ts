@@ -69,18 +69,18 @@ export function calculateOrdersPnL(
 		}
 	};
 
-	const calculateUnrealizedPnl = () => {
+	const calculateUnrealizedPnl = (price?: number) => {
+		price = price || currentPrice;
+
 		return (
 			buyStack.reduce(
 				(total, buyOrder) =>
-					total +
-					(currentPrice - buyOrder.avgPrice) * buyOrder.quantity,
+					total + (price - buyOrder.avgPrice) * buyOrder.quantity,
 				0,
 			) +
 			sellStack.reduce(
 				(total, sellOrder) =>
-					total +
-					(sellOrder.avgPrice - currentPrice) * sellOrder.quantity,
+					total + (sellOrder.avgPrice - price) * sellOrder.quantity,
 				0,
 			)
 		);
@@ -117,7 +117,7 @@ export function calculateOrdersPnL(
 
 		fee -= order.fee;
 
-		const unrealizedPnL = calculateUnrealizedPnl();
+		const unrealizedPnL = calculateUnrealizedPnl(order.avgPrice);
 		const realizedPnL = totalProfit + fee;
 		const pnl = unrealizedPnL + realizedPnL;
 
