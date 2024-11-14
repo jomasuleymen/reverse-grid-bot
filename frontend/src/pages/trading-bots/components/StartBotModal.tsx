@@ -157,7 +157,7 @@ const StartBotModal: React.FC = () => {
             <Select placeholder="Выберите учетные данные" loading={isFetching}>
               {credentials.map((credential) => (
                 <Select.Option key={credential.id} value={credential.id}>
-                  {`${credential.exchange} - ${credential.type}`}
+                  {`${credential.exchange} - ${credential.type} - ${credential.name}`}
                 </Select.Option>
               ))}
             </Select>
