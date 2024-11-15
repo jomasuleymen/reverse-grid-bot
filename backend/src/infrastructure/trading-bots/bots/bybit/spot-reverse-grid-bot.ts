@@ -15,8 +15,9 @@ import {
 	WebsocketClient,
 } from 'bybit-api';
 import { Agent } from 'http';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 import { SECOND } from 'time-constants';
-import * as tunnel from 'tunnel';
 import { BaseReverseGridBot } from '../common/base-reverse-grid-bot';
 
 @Injectable({ scope: Scope.TRANSIENT })
@@ -37,15 +38,16 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			this.credentials.type == ExchangeCredentialsType.Testnet;
 
 		let httpsAgent: Agent | undefined;
+		let socksAgent: Agent | undefined;
 
 		if (this.proxy) {
-			httpsAgent = tunnel.httpsOverHttp({
-				proxy: {
-					host: this.proxy.ip,
-					port: this.proxy.port.http,
-					proxyAuth: `${this.proxy.login}:${this.proxy.password}`,
-				},
-			});
+			httpsAgent = new HttpsProxyAgent(
+				`http://${this.proxy.login}:${this.proxy.password}@${this.proxy.ip}:${this.proxy.port.http}`,
+			);
+
+			socksAgent = new SocksProxyAgent(
+				`socks5://${this.proxy.login}:${this.proxy.password}@${this.proxy.ip}:${this.proxy.port.socket}`,
+			);
 		}
 
 		this.restClient = new RestClientV5(
@@ -56,7 +58,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 				recv_window: 10 * SECOND,
 			},
 			{
-				httpsAgent,
+				httpsAgent: httpsAgent,
 			},
 		);
 
@@ -66,7 +68,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			market: 'v5',
 			demoTrading: isTestnet,
 			requestOptions: {
-				httpsAgent,
+				agent: socksAgent,
 			},
 		});
 	}
