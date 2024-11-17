@@ -1,6 +1,7 @@
 import { TradePosition } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { Transform } from 'class-transformer';
 import {
+	IsBoolean,
 	IsEnum,
 	IsNumber,
 	IsOptional,
@@ -42,6 +43,10 @@ export class StartBotDto {
 	@IsOptional()
 	@IsPositive()
 	triggerPrice?: number;
+
+	@IsBoolean()
+	@IsOptional()
+	tradeOnStart?: boolean;
 
 	@IsNumber()
 	@IsPositive()

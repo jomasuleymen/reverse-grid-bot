@@ -3,6 +3,7 @@ import { IProxy } from '@/domain/interfaces/proxy.interface';
 import {
 	BotState,
 	CreateTradingBotOrder,
+	CreateTradingBotStopOrder,
 	IExchangeCredentials,
 	IStartReverseBotOptions,
 	ITradingBot,
@@ -29,6 +30,8 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	protected proxy?: IProxy;
 	protected credentials: IExchangeCredentials;
 	protected symbol: string;
+
+	protected startPrice: number;
 
 	@Inject(LoggerService)
 	protected readonly logger: LoggerService;
@@ -87,9 +90,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		await this.postSetConfiguration();
 
-		await this.getTickerPrice(this.symbol).catch((err) => {
-			throw new Error(err?.message || 'Произошла неизвестная ошибка');
-		});
+		this.startPrice = await this.getTickerPrice(this.symbol).catch(
+			(err) => {
+				throw new Error(err?.message || 'Произошла неизвестная ошибка');
+			},
+		);
 
 		const snapshot = await this.createSnapshot();
 
@@ -114,12 +119,30 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	protected async successInit() {
-		if (this.config.triggerPrice) {
+		if (this.config.tradeOnStart) {
+			return this.makeFirstOrder();
+		} else if (this.config.triggerPrice) {
 			this.callBacks.onStateUpdate(BotState.WaitingForTriggerPrice);
-			this.waitForTriggerPrice();
-		} else {
-			this.makeFirstOrder();
+			await this.waitForTriggerPrice();
+			return this.makeFirstOrder();
 		}
+
+		this.initiateTrading(this.startPrice);
+
+		const triggerOrders = this.getMissedTriggerSideOrders(this.startPrice);
+		const triggerPrices = triggerOrders.map((o) => o.triggerPrice);
+		this.triggerPrices.minPrice = Math.min(...triggerPrices);
+		this.triggerPrices.maxPrice = Math.max(...triggerPrices);
+
+		this.submitOrders(triggerOrders).then((res) => {
+			if (res.ok) {
+				this.callBacks.onStateUpdate(BotState.Running, {
+					snapshots: this.snapshots,
+				});
+			} else {
+				this.stop({ isError: true, reason: res.message });
+			}
+		});
 	}
 
 	private validateCurrencyBalance(
@@ -156,13 +179,18 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				});
 
 			this.snapshots.end = await this.createSnapshot();
-
-			this.snapshots.end.walletBalance.coins.find(
-				(coin) => coin.coin === this.config.baseCurrency,
-			);
 		} catch (err) {
 			this.logger.error('error while stopping bot', err);
 		} finally {
+			// let allQuantity: number | undefined = 0;
+			// if (this.snapshots.end?.walletBalance) {
+			// 	const foundCoin = this.snapshots.end.walletBalance.coins.find(
+			// 		(coin) => coin.coin === this.config.baseCurrency,
+			// 	);
+
+			// 	allQuantity = foundCoin?.balance;
+			// }
+
 			const sentLastTrade = await this.closeAllPositions().catch(
 				() => false,
 			);
@@ -236,9 +264,8 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			this.state === BotState.Idle
 		) {
 			if (type === OrderCreationType.FIRST_TRADE) {
-				this.updateState(BotState.Running);
-				this.updateTriggerPrices(order.avgPrice);
 				triggerPrice = order.avgPrice;
+				this.initiateTrading(triggerPrice);
 			}
 
 			if (
@@ -263,25 +290,10 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 						symbol: this.symbol,
 					});
 
-					this.updateTriggerPrices(stopLoss);
+					const triggerOrders =
+						this.getMissedTriggerSideOrders(triggerPrice);
 
-					while (this.shouldCreateNextTrigger(triggerPrice)) {
-						const nextTriggerPrice = this.getNextTriggerPrice();
-
-						newOrders.push({
-							type: 'stop-order',
-							side: this.TRIGGER_SIDE,
-							triggerPrice: nextTriggerPrice,
-							quantity: order.quantity,
-							customId: this.getCustomOrderId(
-								OrderCreationType.TRIGGER,
-								nextTriggerPrice,
-							),
-							symbol: this.symbol,
-						});
-
-						this.updateTriggerPrices(nextTriggerPrice);
-					}
+					newOrders.push(...triggerOrders);
 				} else {
 					const newTriggerPrice = triggerPrice + this.config.gridStep;
 
@@ -309,6 +321,35 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 	private async handleLastOrder(order: TradingBotOrder) {
 		this.cleanUp();
+	}
+
+	private getMissedTriggerSideOrders(triggerPrice: number) {
+		const orders: CreateTradingBotStopOrder[] = [];
+
+		while (this.shouldCreateNextTrigger(triggerPrice)) {
+			const nextTriggerPrice = this.getNextTriggerPrice();
+
+			orders.push({
+				type: 'stop-order',
+				side: this.TRIGGER_SIDE,
+				triggerPrice: nextTriggerPrice,
+				quantity: this.config.gridVolume,
+				customId: this.getCustomOrderId(
+					OrderCreationType.TRIGGER,
+					nextTriggerPrice,
+				),
+				symbol: this.symbol,
+			});
+
+			this.updateTriggerPrices(nextTriggerPrice);
+		}
+
+		return orders;
+	}
+
+	private initiateTrading(triggerPrice: number) {
+		this.updateTriggerPrices(triggerPrice);
+		this.updateState(BotState.Running);
 	}
 
 	private shouldCreateNextTrigger(triggerPrice: number): boolean {
@@ -373,6 +414,8 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		}
 
 		this.logger.info('closeAllPositions', { allQuantity });
+		allQuantity = Number((Number(allQuantity) + 1 - 1).toFixed(6));
+		this.logger.info('closeAllPositions after normalize', { allQuantity });
 
 		if (allQuantity > 0) {
 			await this.submitOrders({
@@ -428,8 +471,6 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		) {
 			await sleep(100);
 		}
-
-		this.makeFirstOrder();
 	}
 
 	protected async makeFirstOrder() {

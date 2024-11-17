@@ -85,6 +85,7 @@ export class TradingBotStartConsumer extends WorkerHost {
 						position: botEntity.position,
 						takeProfit: botEntity.takeProfit,
 						triggerPrice: botEntity.triggerPrice,
+						tradeOnStart: botEntity.tradeOnStart,
 					},
 					proxy: foundProxy,
 					credentials,

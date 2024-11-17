@@ -55,6 +55,7 @@ export class TradingBotService {
 			quoteCurrency: options.quoteCurrency,
 			position: options.position,
 			triggerPrice: options.triggerPrice,
+			tradeOnStart: options.tradeOnStart,
 		});
 
 		await this.tradingBotStartQueue.add('start', {

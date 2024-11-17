@@ -63,6 +63,9 @@ export class TradingBotEntity {
 	@Column({ type: 'integer', default: BotState.Idle })
 	state: BotState;
 
+	@Column({ type: 'boolean', default: true })
+	tradeOnStart: boolean;
+
 	@Index()
 	@Column()
 	userId: number;
