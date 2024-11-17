@@ -115,7 +115,6 @@ const StartBotModal: React.FC = () => {
         quoteCurrency: selectedConfig.quoteCurrency,
         gridStep: selectedConfig.gridStep,
         gridVolume: selectedConfig.gridVolume,
-        takeProfitOnGrid: selectedConfig.takeProfitOnGrid,
       })
     }
   }

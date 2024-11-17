@@ -19,6 +19,7 @@ import { FallbackResult } from '@/infrastructure/utils/request.utils';
 import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common';
 import { generateNewOrderId } from 'binance';
 import sleep from 'sleep-promise';
+import { TradingBotEntity } from '../../entities/trading-bots.entity';
 
 type TradingBotState = BotState.Idle | BotState.Running | BotState.Stopped;
 
@@ -437,7 +438,10 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		await this.submitOrders({
 			side: this.TRIGGER_SIDE,
-			customId: this.getCustomOrderId(OrderCreationType.FIRST_TRADE, 0),
+			customId: this.getCustomOrderId(
+				OrderCreationType.FIRST_TRADE,
+				this.config.triggerPrice || 0,
+			),
 			type: 'order',
 			quantity: this.config.gridVolume,
 			symbol: this.symbol,
@@ -558,13 +562,43 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				return;
 			}
 
-			const state = await this.callBacks.checkBotState();
-			if (state === BotState.Stopped || state === BotState.Stopping) {
+			const botConfig = await this.callBacks.getBotConfig();
+			if (
+				botConfig.state === BotState.Stopped ||
+				botConfig.state === BotState.Stopping
+			) {
 				this.stop({ reason: 'Ручная остановка' });
 				return;
 			}
 
+			this.checkBotConfigForUpdates(botConfig);
+
 			await sleep(150);
+		}
+	}
+
+	private checkBotConfigForUpdates(botEntity: TradingBotEntity) {
+		if (botEntity.gridStep !== Math.abs(this.config.gridStep)) {
+			this.config.gridStep =
+				this.config.position === TradePosition.SHORT
+					? -botEntity.gridStep
+					: botEntity.gridStep;
+		}
+
+		if (botEntity.gridVolume !== this.config.gridVolume) {
+			this.config.gridVolume = botEntity.gridVolume;
+		}
+
+		if (botEntity.takeProfit !== this.config.takeProfit) {
+			this.config.takeProfit = botEntity.takeProfit;
+		}
+
+		if (botEntity.takeProfitOnGrid !== this.config.takeProfitOnGrid) {
+			this.config.takeProfitOnGrid = botEntity.takeProfitOnGrid;
+		}
+
+		if (botEntity.triggerPrice !== this.config.triggerPrice) {
+			this.config.triggerPrice = botEntity.triggerPrice;
 		}
 	}
 

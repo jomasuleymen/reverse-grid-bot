@@ -146,6 +146,10 @@ export const TRADING_BOT_API = {
     return await $api.get<TradingBot>(`${TRADING_BOT_ENDPOINT}/${botId}`).then((res) => res.data)
   },
 
+  async editBot(botId: string | number, data: Partial<TradingBotConfig>) {
+    return await $api.put<any>(`${TRADING_BOT_ENDPOINT}/${botId}`, data).then((res) => res.data)
+  },
+
   async startBot(options: IStartBotOptions) {
     return await $api.post<any>(`${TRADING_BOT_ENDPOINT}/start`, options).then((res) => res.data)
   },

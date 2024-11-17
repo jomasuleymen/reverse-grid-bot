@@ -1,3 +1,4 @@
+import { TradingBotEntity } from '@/infrastructure/trading-bots/entities/trading-bots.entity';
 import { ExchangeEnum, OrderSide } from '../exchanges/common.interface';
 import { IProxy } from '../proxy.interface';
 import { WalletBalance } from './wallet.interface';
@@ -15,20 +16,25 @@ export type TradingBotOrder = {
 	triggerPrice?: number;
 };
 
-export type CreateTradingBotOrder = {
+export type CreateTradingBotOrderBase = {
 	customId: string;
 	quantity: number;
 	side: OrderSide;
 	symbol: string;
-} & (
-	| {
-			type: 'order';
-	  }
-	| {
-			triggerPrice: number;
-			type: 'stop-loss' | 'stop-order';
-	  }
-);
+};
+
+export type CreateTradingBotImmediateOrder = CreateTradingBotOrderBase & {
+	type: 'order';
+};
+
+export type CreateTradingBotStopOrder = CreateTradingBotOrderBase & {
+	triggerPrice: number;
+	type: 'stop-loss' | 'stop-order';
+};
+
+export type CreateTradingBotOrder =
+	| CreateTradingBotImmediateOrder
+	| CreateTradingBotStopOrder;
 
 export type TradingBotSnapshot = {
 	datetime: Date;
@@ -79,7 +85,7 @@ export interface IStartReverseBotOptions {
 	credentials: IExchangeCredentials;
 	proxy?: IProxy;
 	callBacks: {
-		checkBotState: () => Promise<BotState>;
+		getBotConfig: () => Promise<TradingBotEntity>;
 		onNewOrder: (order: TradingBotOrder) => Promise<void>;
 
 		onStateUpdate: (

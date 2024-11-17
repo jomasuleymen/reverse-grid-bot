@@ -9,7 +9,7 @@ import {
 } from '@/services/trading-bot.service'
 import { formatDate } from '@/utils'
 import { useQueryClient } from '@tanstack/react-query'
-import { Space, Tag, Typography } from 'antd'
+import { Flex, Space, Tag, Typography } from 'antd'
 import { ColumnsType } from 'antd/es/table'
 import { BaseType } from 'antd/es/typography/Base'
 import React from 'react'
@@ -19,6 +19,7 @@ import {
   NON_ACTIVE_TRADING_BOTS_QUERY_KEY,
   TRADING_BOTS_QUERY_KEY,
 } from '..'
+import EditBotModal from './EditBotModal'
 
 const { Text, Link: LinkStyle } = Typography
 
@@ -197,15 +198,18 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
           TradingBotState.WaitingForTriggerPrice,
           TradingBotState.Initializing,
         ].includes(record.state) && (
-          <ConfirmModal
-            modalTitle="Остановить бота?"
-            onOk={() => SERVICES.TRADING_BOT.stopBot(record.id)}
-            invalidateQueryKey={TRADING_BOTS_QUERY_KEY}
-            actionText="Остановить"
-            cancelText="Отмена"
-            okText="Остановить"
-            okType="danger"
-          />
+          <Flex vertical>
+            <EditBotModal botId={record.id} />
+            <ConfirmModal
+              modalTitle="Остановить бота?"
+              onOk={() => SERVICES.TRADING_BOT.stopBot(record.id)}
+              invalidateQueryKey={TRADING_BOTS_QUERY_KEY}
+              actionText="Остановить"
+              cancelText="Отмена"
+              okText="Остановить"
+              okType="danger"
+            />
+          </Flex>
         )}
         <Link className="text-blue-500" to={`${record.id}/orders`}>
           Детали

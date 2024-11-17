@@ -8,11 +8,13 @@ import {
 	Get,
 	Param,
 	Post,
+	Put,
 	Query,
 } from '@nestjs/common';
 import { GetTradingBotsDto } from './dto/get-bots.dto';
 import { StartBotDto } from './dto/start-bot.dto';
 import { StopBotDto } from './dto/stop-bot.dto';
+import { UpdateBotDto } from './dto/update-bot.dto';
 import { TradingBotOrdersService } from './trading-bot-orders.service';
 import { TradingBotService } from './trading-bots.service';
 
@@ -68,5 +70,14 @@ export class TradingBotsController {
 		if (!bot) throw new BadRequestException('Бот не найден');
 
 		return bot;
+	}
+
+	@Put(':id')
+	async editBot(
+		@Param('id') id: string,
+		@Body() payload: UpdateBotDto,
+		@UseSession() user: UserSession,
+	) {
+		return await this.tradingBotService.update(+id, payload);
 	}
 }

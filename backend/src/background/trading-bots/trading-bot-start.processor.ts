@@ -156,10 +156,13 @@ export class TradingBotStartConsumer extends WorkerHost {
 							}
 						},
 
-						checkBotState: async () => {
-							return await this.tradingBotService.getBotStatus(
-								botEntity.id,
-							);
+						getBotConfig: async () => {
+							const bot =
+								await this.tradingBotService.findBotById(
+									botEntity.id,
+								);
+
+							return bot!;
 						},
 
 						onNewOrder: async (order) => {
