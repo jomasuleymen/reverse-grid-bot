@@ -29,12 +29,22 @@ type FormItemType = FormItemProps<TCreateTradingBotConfigForm>
 const StartBotFormItems: (FormItemType | FormItemType[])[] = [
   ...BotConfigFormItems,
   {
-    label: 'Тейк-профит',
-    name: 'takeProfit',
-    rules: [{ required: true }],
-    required: true,
+    label: 'Триггер',
+    name: 'triggerPrice',
     children: <CustomInputNumber />,
   },
+  [
+    {
+      label: 'Тейк-профит на сетке',
+      name: 'takeProfitOnGrid',
+      children: <CustomInputNumber />,
+    },
+    {
+      label: 'Тейк-профит',
+      name: 'takeProfit',
+      children: <CustomInputNumber />,
+    },
+  ],
   {
     label: 'Позиция',
     name: 'position',

@@ -48,8 +48,9 @@ export enum TradePosition {
 export interface ITradingBotConfig {
 	baseCurrency: string;
 	quoteCurrency: string;
-	takeProfitOnGrid: number;
-	takeProfit: number;
+	takeProfitOnGrid?: number;
+	takeProfit?: number;
+	triggerPrice?: number;
 	gridStep: number;
 	gridVolume: number;
 	position: TradePosition;
@@ -70,6 +71,7 @@ export enum BotState {
 	Stopped = 4,
 	Stopping = 5,
 	Errored = 6,
+	WaitingForTriggerPrice = 7,
 }
 
 export interface IStartReverseBotOptions {

@@ -13,7 +13,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
-import { Equal, FindOptionsWhere, Or, Repository } from 'typeorm';
+import { Equal, FindOptionsWhere, Not, Or, Repository } from 'typeorm';
 import { ExchangeCredentialsService } from '../exchanges/exchange-credentials/exchange-credentials.service';
 import { QUEUES } from '../services/bull/bull.const';
 import { BinanceSpotReverseGridBot } from './bots/binance/spot-reverse-grid-bot';
@@ -21,7 +21,6 @@ import { BybitSpotReverseGridBot } from './bots/bybit/spot-reverse-grid-bot';
 import { GetTradingBotsDto } from './dto/get-bots.dto';
 import { StartBotDto } from './dto/start-bot.dto';
 import { TradingBotEntity } from './entities/trading-bots.entity';
-import { TradingBotOrdersService } from './trading-bot-orders.service';
 
 @Injectable()
 export class TradingBotService {
@@ -30,7 +29,6 @@ export class TradingBotService {
 		@InjectRepository(TradingBotEntity)
 		private readonly tradingBotRepo: Repository<TradingBotEntity>,
 		private readonly exchangeCredentialsService: ExchangeCredentialsService,
-		private readonly tradingBotOrdersService: TradingBotOrdersService,
 		@InjectQueue(QUEUES.TRADING_BOT_START)
 		private tradingBotStartQueue: Queue<IStartTradingBotQueueData>,
 		@InjectQueue(QUEUES.TRADING_BOT_STOP)
@@ -56,6 +54,7 @@ export class TradingBotService {
 			baseCurrency: options.baseCurrency,
 			quoteCurrency: options.quoteCurrency,
 			position: options.position,
+			triggerPrice: options.triggerPrice,
 		});
 
 		await this.tradingBotStartQueue.add('start', {
@@ -95,11 +94,8 @@ export class TradingBotService {
 					Equal(BotState.Errored),
 				);
 			} else if (payload.isActive === true) {
-				where.state = Or(
-					Equal(BotState.Idle),
-					Equal(BotState.Initializing),
-					Equal(BotState.Running),
-					Equal(BotState.Stopping),
+				where.state = Not(
+					Or(Equal(BotState.Stopped), Equal(BotState.Errored)),
 				);
 			}
 

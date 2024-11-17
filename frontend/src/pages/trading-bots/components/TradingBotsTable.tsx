@@ -37,6 +37,8 @@ export function getBotStateLabel(state: TradingBotState): StateLabel {
       return { label: 'Ожидание', color: 'secondary' }
     case TradingBotState.Initializing:
       return { label: 'Инициализация', color: 'secondary' }
+    case TradingBotState.WaitingForTriggerPrice:
+      return { label: 'Ожидание триггера', color: 'secondary' }
     case TradingBotState.Running:
       return { label: 'Запущен', color: 'success' }
     case TradingBotState.Stopping:
@@ -98,17 +100,25 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
     title: 'Тейк-профит',
     align: 'center',
     render: (value, record) => {
-      return (
-        <div>
-          <span>{record.takeProfitOnGrid} - сетка</span>
-          {record.takeProfit && (
-            <>
-              <br />
-              <span> {record.takeProfit + ' ' + record.quoteCurrency}</span>
-            </>
-          )}
-        </div>
-      )
+      if (record.takeProfitOnGrid && record.takeProfit) {
+        return (
+          <span>
+            {record.takeProfitOnGrid} - сетка
+            <br />
+            {record.takeProfit + ' ' + record.quoteCurrency}
+          </span>
+        )
+      }
+
+      if (record.takeProfitOnGrid) {
+        return <span>{record.takeProfitOnGrid} - сетка</span>
+      }
+
+      if (record.takeProfit) {
+        return <span>{record.takeProfit + ' ' + record.quoteCurrency}</span>
+      }
+
+      return '-'
     },
   },
   {
@@ -124,9 +134,20 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
     title: 'Время остановки',
     dataIndex: 'stoppedAt',
     align: 'center',
+    hidden: options?.isActive,
     render(value, record) {
       if (!value) return
       return <span>{formatDate(value, { showTime: true })}</span>
+    },
+  },
+  {
+    title: 'Триггер',
+    dataIndex: 'triggerPrice',
+    align: 'center',
+    width: '90px',
+    render: (value, record) => {
+      if (!value) return '-'
+      return <span>{value + ' ' + record.quoteCurrency}</span>
     },
   },
   {
@@ -158,7 +179,7 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
   },
   {
     title: 'Причина остановки',
-    dataIndex: 'state',
+    dataIndex: 'stopReason',
     hidden: options?.isActive,
     align: 'center',
     width: '60px',
@@ -171,7 +192,11 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
     key: 'action',
     render: (_, record: ColumnType) => (
       <Space>
-        {[TradingBotState.Running].includes(record.state) && (
+        {[
+          TradingBotState.Running,
+          TradingBotState.WaitingForTriggerPrice,
+          TradingBotState.Initializing,
+        ].includes(record.state) && (
           <ConfirmModal
             modalTitle="Остановить бота?"
             onOk={() => SERVICES.TRADING_BOT.stopBot(record.id)}

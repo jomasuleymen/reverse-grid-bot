@@ -81,7 +81,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		this.wsClient.subscribeV5('order', 'spot');
 		const handler = (data: any) => {
 			if (data.topic === `tickers.${this.symbol}` && data.data) {
-				this.updateLastPrice(Number(data.data.lastPrice));
+				this.marketData.currentPrice = Number(data.data.lastPrice);
 			}
 		};
 
@@ -108,7 +108,7 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			if (!data) return;
 
 			if (data.success && data.req_id === 'order') {
-				this.makeFirstOrder();
+				this.successInit();
 			}
 		});
 

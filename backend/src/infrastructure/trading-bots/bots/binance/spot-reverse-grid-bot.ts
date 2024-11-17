@@ -65,7 +65,7 @@ export class BinanceSpotReverseGridBot extends BaseReverseGridBot {
 					if (data.eventType === '24hrTicker') {
 						if (data.symbol === this.symbol) {
 							const lastPrice = Number(data.currentClose);
-							this.updateLastPrice(lastPrice);
+							this.marketData.currentPrice = lastPrice;
 						}
 						return;
 					} else if (data.eventType === 'executionReport') {

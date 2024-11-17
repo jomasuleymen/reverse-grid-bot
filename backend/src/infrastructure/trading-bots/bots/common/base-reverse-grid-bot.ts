@@ -44,7 +44,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 	private callBacks: IStartReverseBotOptions['callBacks'];
 
-	private readonly marketData = {
+	protected readonly marketData = {
 		currentPrice: 0,
 	};
 	private readonly gridConfig = {
@@ -110,6 +110,15 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		this.checkBotState();
 		this.checkMissedTriggers();
+	}
+
+	protected async successInit() {
+		if (this.config.triggerPrice) {
+			this.callBacks.onStateUpdate(BotState.WaitingForTriggerPrice);
+			this.waitForTriggerPrice();
+		} else {
+			this.makeFirstOrder();
+		}
 	}
 
 	private validateCurrencyBalance(
@@ -344,10 +353,6 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		return edgePrice - this.config.gridStep;
 	}
 
-	protected updateLastPrice(lastPrice: number) {
-		this.marketData.currentPrice = lastPrice;
-	}
-
 	private updateTriggerPrices(price: number) {
 		this.triggerPrices.maxPrice = Math.max(
 			this.triggerPrices.maxPrice,
@@ -403,9 +408,27 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		this.callBacks.onNewOrder(order);
 
 		const stopLossCount = this.getStopLossCount();
-		if (this.config.takeProfitOnGrid <= stopLossCount) {
+		if (
+			this.config.takeProfitOnGrid &&
+			this.config.takeProfitOnGrid <= stopLossCount
+		) {
 			this.stop({ reason: 'Тейк-профит на сетке' });
 		}
+	}
+
+	private async waitForTriggerPrice() {
+		while (
+			this.state === BotState.Idle &&
+			this.config.triggerPrice &&
+			((this.config.position === TradePosition.LONG &&
+				this.config.triggerPrice > this.marketData.currentPrice) ||
+				(this.config.position === TradePosition.SHORT &&
+					this.config.triggerPrice < this.marketData.currentPrice))
+		) {
+			await sleep(100);
+		}
+
+		this.makeFirstOrder();
 	}
 
 	protected async makeFirstOrder() {
@@ -517,7 +540,9 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	private isTakeProfitTriggered() {
-		if (!this.marketData.currentPrice) return false;
+		if (!this.config.takeProfit || !this.marketData.currentPrice)
+			return false;
+
 		return this.config.position === TradePosition.LONG
 			? this.marketData.currentPrice >= this.config.takeProfit
 			: this.marketData.currentPrice <= this.config.takeProfit;

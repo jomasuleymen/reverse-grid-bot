@@ -41,13 +41,6 @@ export const BotConfigFormItems: (FormItemType | FormItemType[])[] = [
     required: true,
     children: <CustomInputNumber />,
   },
-  {
-    label: 'Тейк-профит на сетке',
-    name: 'takeProfitOnGrid',
-    rules: [{ required: true }],
-    required: true,
-    children: <CustomInputNumber />,
-  },
 ]
 
 interface TopBarProps {}

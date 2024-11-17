@@ -18,9 +18,6 @@ export class TradingBotConfigEntity {
 	@Column()
 	quoteCurrency: string;
 
-	@Column({ type: 'integer' })
-	takeProfitOnGrid: number;
-
 	@Column({ type: 'real' })
 	gridStep: number;
 

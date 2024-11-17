@@ -12,16 +12,17 @@ export enum TradePosition {
 
 export type TradingBotConfig = {
   id: number
-  takeProfitOnGrid: number
-  takeProfit: number
   gridStep: number
   gridVolume: number
   baseCurrency: string
   quoteCurrency: string
   createdAt: string
   stoppedAt: string
-  stopReason?: string
   position: TradePosition
+  stopReason?: string
+  takeProfitOnGrid?: number
+  takeProfit?: number
+  triggerPrice?: number
 }
 
 export enum TradingBotState {
@@ -31,6 +32,7 @@ export enum TradingBotState {
   Stopped = 4,
   Stopping = 5,
   Errored = 6,
+  WaitingForTriggerPrice = 7,
 }
 
 export type TradingBot = {

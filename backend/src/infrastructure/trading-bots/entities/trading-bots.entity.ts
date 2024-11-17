@@ -33,7 +33,7 @@ export class TradingBotEntity {
 	exchange: ExchangeEnum;
 
 	@Column({ nullable: true })
-	name: string;
+	name?: string;
 
 	@Column()
 	baseCurrency: string;
@@ -41,11 +41,14 @@ export class TradingBotEntity {
 	@Column()
 	quoteCurrency: string;
 
-	@Column({ type: 'integer' })
-	takeProfitOnGrid: number;
+	@Column({ type: 'integer', nullable: true })
+	takeProfitOnGrid?: number;
 
 	@Column({ type: 'real', nullable: true })
-	takeProfit: number;
+	takeProfit?: number;
+
+	@Column({ type: 'real', nullable: true })
+	triggerPrice?: number;
 
 	@Column({ type: 'real' })
 	gridStep: number;

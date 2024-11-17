@@ -45,11 +45,6 @@ const getColumns = (queryKey: string[]): ColumnsType<ColumnType> => [
     align: 'center',
   },
   {
-    title: 'Тейк-профит на сетке',
-    dataIndex: 'takeProfitOnGrid',
-    align: 'center',
-  },
-  {
     title: 'Действия',
     key: 'action',
     render: (_, record: ColumnType) => (

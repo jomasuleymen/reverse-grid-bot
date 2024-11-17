@@ -1,6 +1,6 @@
 import { TradePosition } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { Transform } from 'class-transformer';
-import { IsEnum, IsNumber, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class StartBotDto {
 	@IsNumber()
@@ -23,10 +23,16 @@ export class StartBotDto {
 	quoteCurrency: string;
 
 	@IsNumber()
-	takeProfitOnGrid: number;
+	@IsOptional()
+	takeProfitOnGrid?: number;
 
 	@IsNumber()
-	takeProfit: number;
+	@IsOptional()
+	takeProfit?: number;
+
+	@IsNumber()
+	@IsOptional()
+	triggerPrice?: number;
 
 	@IsNumber()
 	gridStep: number;

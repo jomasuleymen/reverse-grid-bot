@@ -84,6 +84,7 @@ export class TradingBotStartConsumer extends WorkerHost {
 						takeProfitOnGrid: botEntity.takeProfitOnGrid,
 						position: botEntity.position,
 						takeProfit: botEntity.takeProfit,
+						triggerPrice: botEntity.triggerPrice,
 					},
 					proxy: foundProxy,
 					credentials,
@@ -105,6 +106,12 @@ export class TradingBotStartConsumer extends WorkerHost {
 
 								await this.tradingBotService.update(botId, {
 									state: BotState.Running,
+								});
+							} else if (
+								state === BotState.WaitingForTriggerPrice
+							) {
+								await this.tradingBotService.update(botId, {
+									state: BotState.WaitingForTriggerPrice,
 								});
 							} else if (state === BotState.Stopped) {
 								if (
@@ -219,8 +226,8 @@ export class TradingBotStartConsumer extends WorkerHost {
 		return {};
 	}
 
-	@OnWorkerEvent('error')
-	async error(failedReason: unknown) {
+	@OnWorkerEvent('failed')
+	async failed(failedReason: unknown) {
 		this.loggerService.error('Failed starting trading bot', failedReason);
 	}
 }

@@ -120,8 +120,8 @@ export class ReverseGridBotSimulateConsumer extends WorkerHost {
 		});
 	}
 
-	@OnWorkerEvent('error')
-	async error(failedReason: unknown) {
+	@OnWorkerEvent('failed')
+	async failed(failedReason: unknown) {
 		this.loggerService.error(
 			'Failed while simulating the reverse grid bot',
 			failedReason,

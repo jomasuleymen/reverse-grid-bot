@@ -29,8 +29,8 @@ export class TradingBotStopConsumer extends WorkerHost {
 		return {};
 	}
 
-	@OnWorkerEvent('error')
-	async error(failedReason: unknown) {
+	@OnWorkerEvent('failed')
+	async failed(failedReason: unknown) {
 		this.loggerService.error(
 			'Failed while stopping trading bot',
 			failedReason,
