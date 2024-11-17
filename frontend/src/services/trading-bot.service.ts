@@ -23,6 +23,7 @@ export type TradingBotConfig = {
   takeProfitOnGrid?: number
   takeProfit?: number
   triggerPrice?: number
+  tradeOnStart?: boolean
 }
 
 export enum TradingBotState {

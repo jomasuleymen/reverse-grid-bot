@@ -11,7 +11,19 @@ import { SERVICES } from '@/services'
 import { ExchangeCredentials } from '@/services/exchanges.service'
 import { IStartBotOptions, TradePosition, TradingBotConfig } from '@/services/trading-bot.service'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Col, Flex, Form, FormItemProps, Modal, Radio, Row, Select } from 'antd'
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Col,
+  Flex,
+  Form,
+  FormItemProps,
+  Modal,
+  Radio,
+  Row,
+  Select,
+} from 'antd'
 import React, { useState } from 'react'
 import { TRADING_BOTS_QUERY_KEY } from '..'
 
@@ -51,15 +63,22 @@ const StartBotFormItems: (FormItemType | FormItemType[])[] = [
     rules: [{ required: true }],
     required: true,
     children: (
-      <Radio.Group defaultValue="Pear" optionType="button">
+      <Radio.Group optionType="button">
         <Radio.Button value={TradePosition.LONG}>LONG</Radio.Button>
         <Radio.Button value={TradePosition.SHORT}>SHORT</Radio.Button>
       </Radio.Group>
     ),
   },
+  {
+    name: 'tradeOnStart',
+    valuePropName: 'checked',
+    initialValue: true,
+    label: null,
+    children: <Checkbox checked>Немедленная торговля</Checkbox>,
+  },
 ]
 
-const getFormItem = (item: FormItemProps) => {
+const getFormItem = (item: FormItemProps, hidden?: boolean) => {
   return (
     <Form.Item
       key={item.name?.toString()}
@@ -68,6 +87,7 @@ const getFormItem = (item: FormItemProps) => {
       rules={item.rules}
       children={item.children}
       style={{ flex: 1 }}
+      hidden={hidden}
       {...item}
     />
   )
@@ -76,6 +96,7 @@ const getFormItem = (item: FormItemProps) => {
 const StartBotModal: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [form] = Form.useForm()
+  const tradeOnStart = Form.useWatch('tradeOnStart', form)
 
   const queryClient = useQueryClient()
 
@@ -186,16 +207,21 @@ const StartBotModal: React.FC = () => {
               </Select.Option>
             ))}
           </Select>
+          {StartBotFormItems.map((item, idx) => {
+            if (Array.isArray(item)) {
+              return (
+                <Flex gap={10} key={'items-' + idx}>
+                  {item.map((item) => getFormItem(item))}
+                </Flex>
+              )
+            }
 
-          {StartBotFormItems.map((item, idx) =>
-            Array.isArray(item) ? (
-              <Flex gap={10} key={'items-' + idx}>
-                {item.map(getFormItem)}
-              </Flex>
-            ) : (
-              getFormItem(item)
-            ),
-          )}
+            if (item.name === 'triggerPrice') {
+              return getFormItem(item, tradeOnStart)
+            }
+
+            return getFormItem(item)
+          })}
 
           {isError && <ErrorDisplay className="mb-2" error={error as any} />}
 
