@@ -124,7 +124,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		} else if (this.config.triggerPrice) {
 			this.callBacks.onStateUpdate(BotState.WaitingForTriggerPrice);
 			await this.waitForTriggerPrice();
-			return this.makeFirstOrder();
+			if (this.state === BotState.Idle) {
+				this.makeFirstOrder();
+			}
+
+			return;
 		}
 
 		this.initiateTrading(this.startPrice);
@@ -290,10 +294,14 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 						symbol: this.symbol,
 					});
 
-					const triggerOrders =
-						this.getMissedTriggerSideOrders(triggerPrice);
+					if (triggerPrice) {
+						const triggerOrders =
+							this.getMissedTriggerSideOrders(triggerPrice);
 
-					newOrders.push(...triggerOrders);
+						newOrders.push(...triggerOrders);
+					} else {
+						this.logger.info('no trigger price', { order });
+					}
 				} else {
 					const newTriggerPrice = triggerPrice + this.config.gridStep;
 
@@ -342,6 +350,12 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			});
 
 			this.updateTriggerPrices(nextTriggerPrice);
+
+			this.logger.info('getMissedTriggerSideOrders', {
+				triggerPrice,
+				nextTriggerPrice,
+				orders,
+			});
 		}
 
 		return orders;
@@ -574,6 +588,12 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 				});
 
 				this.updateTriggerPrices(missedTriggerPrice);
+
+				this.logger.info('checkMissedTriggers', {
+					missedTriggerPrice,
+					currentPrice: this.marketData.currentPrice,
+					orders,
+				});
 			}
 
 			if (orders.length) {
@@ -614,7 +634,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 			this.checkBotConfigForUpdates(botConfig);
 
-			await sleep(150);
+			await sleep(100);
 		}
 	}
 
