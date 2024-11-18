@@ -614,7 +614,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	private async checkBotState() {
-		while (true) {
+		while (this.state === BotState.Idle) {
+			await sleep(100);
+		}
+
+		while (this.state === BotState.Running) {
 			if (
 				this.state === BotState.Running &&
 				this.isTakeProfitTriggered()
