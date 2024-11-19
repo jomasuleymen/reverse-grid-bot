@@ -17,6 +17,7 @@ import { WalletBalance } from '@/domain/interfaces/trading-bots/wallet.interface
 import { ExchangesService } from '@/infrastructure/exchanges/exchanges.service';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { FallbackResult } from '@/infrastructure/utils/request.utils';
+import { calculatePositionsSummary } from '@/infrastructure/utils/trading-orders.util';
 import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common';
 import { generateNewOrderId } from 'binance';
 import sleep from 'sleep-promise';
@@ -32,6 +33,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	protected symbol: string;
 
 	protected startPrice: number;
+	protected isSuccessInitCalled: boolean;
 
 	@Inject(LoggerService)
 	protected readonly logger: LoggerService;
@@ -119,6 +121,9 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	}
 
 	protected async successInit() {
+		if (this.isSuccessInitCalled) return;
+		this.isSuccessInitCalled = true;
+
 		if (this.config.tradeOnStart) {
 			return this.makeFirstOrder();
 		} else if (this.config.triggerPrice) {
@@ -450,14 +455,6 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	protected addNewOrder(order: TradingBotOrder) {
 		this.orders.push(order);
 		this.callBacks.onNewOrder(order);
-
-		const stopLossCount = this.getStopLossCount();
-		if (
-			this.config.takeProfitOnGrid &&
-			this.config.takeProfitOnGrid <= stopLossCount
-		) {
-			this.stop({ reason: 'Тейк-профит на сетке' });
-		}
 	}
 
 	private async waitForTriggerPrice() {
@@ -583,26 +580,50 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			await sleep(50);
 		}
 	}
-
-	private isTakeProfitTriggered() {
-		if (!this.config.takeProfit || !this.marketData.currentPrice)
+	private isTakeProfitTriggered(): boolean {
+		if (!this.marketData.currentPrice) {
 			return false;
+		}
 
-		return this.config.position === TradePosition.LONG
-			? this.marketData.currentPrice >= this.config.takeProfit
-			: this.marketData.currentPrice <= this.config.takeProfit;
+		if (this.config.takeProfit) {
+			const isLong = this.config.position === TradePosition.LONG;
+			const isTriggered = isLong
+				? this.marketData.currentPrice >= this.config.takeProfit
+				: this.marketData.currentPrice <= this.config.takeProfit;
+			if (isTriggered) {
+				return true;
+			}
+		}
+
+		if (this.config.takeProfitOnGrid) {
+			const stopLossCount = this.getStopLossCount();
+			const isTriggered = stopLossCount >= this.config.takeProfitOnGrid;
+			if (isTriggered) {
+				return true;
+			}
+		}
+
+		if (this.config.takeProfitOnPnl) {
+			const ordersSummary = calculatePositionsSummary(this.orders, {
+				currentPrice: this.marketData.currentPrice,
+			});
+			const isTriggered =
+				ordersSummary.pnl.netPnl >= this.config.takeProfitOnPnl;
+
+			if (isTriggered) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private async checkBotState() {
-		while (true) {
-			if (
-				this.state === BotState.Running &&
-				this.isTakeProfitTriggered()
-			) {
-				this.stop({ reason: 'Тейк-профит' });
-				return;
-			}
+		while (this.state === BotState.Idle) {
+			await sleep(100);
+		}
 
+		while (this.state === BotState.Running) {
 			const botConfig = await this.callBacks.getBotConfig();
 			if (
 				botConfig.state === BotState.Stopped ||
@@ -614,6 +635,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 			this.checkBotConfigForUpdates(botConfig);
 
+			if (this.isTakeProfitTriggered()) {
+				this.stop({ reason: 'Тейк-профит' });
+				return;
+			}
+
 			await sleep(150);
 		}
 	}
@@ -623,7 +649,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			this.config.gridStep =
 				this.config.position === TradePosition.SHORT
 					? -botEntity.gridStep
-					: botEntity.gridStep;
+					: +botEntity.gridStep;
 		}
 
 		if (botEntity.gridVolume !== this.config.gridVolume) {
@@ -640,6 +666,10 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		if (botEntity.triggerPrice !== this.config.triggerPrice) {
 			this.config.triggerPrice = botEntity.triggerPrice;
+		}
+
+		if (botEntity.takeProfitOnPnl !== this.config.takeProfitOnPnl) {
+			this.config.takeProfitOnPnl = botEntity.takeProfitOnPnl;
 		}
 	}
 

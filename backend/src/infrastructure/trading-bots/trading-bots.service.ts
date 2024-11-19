@@ -56,6 +56,7 @@ export class TradingBotService {
 			position: options.position,
 			triggerPrice: options.triggerPrice,
 			tradeOnStart: options.tradeOnStart,
+			takeProfitOnPnl: options.takeProfitOnPnl,
 		});
 
 		await this.tradingBotStartQueue.add('start', {

@@ -48,6 +48,9 @@ export class TradingBotEntity {
 	takeProfit?: number;
 
 	@Column({ type: 'real', nullable: true })
+	takeProfitOnPnl?: number;
+
+	@Column({ type: 'real', nullable: true })
 	triggerPrice?: number;
 
 	@Column({ type: 'real' })

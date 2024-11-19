@@ -104,19 +104,25 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
       if (record.takeProfitOnGrid && record.takeProfit) {
         return (
           <span>
-            {record.takeProfitOnGrid} - сетка
+            {'Сетка: ' + record.takeProfitOnGrid}
             <br />
-            {record.takeProfit + ' ' + record.quoteCurrency}
+            {'Цена: ' + record.takeProfit + ' ' + record.quoteCurrency}
+            <br />
+            {'Pnl: ' + record.takeProfitOnPnl + ' ' + record.quoteCurrency}
           </span>
         )
       }
 
       if (record.takeProfitOnGrid) {
-        return <span>{record.takeProfitOnGrid} - сетка</span>
+        return <span>{'Сетка: ' + record.takeProfitOnGrid}</span>
       }
 
       if (record.takeProfit) {
-        return <span>{record.takeProfit + ' ' + record.quoteCurrency}</span>
+        return <span>{'Цена: ' + record.takeProfit + ' ' + record.quoteCurrency}</span>
+      }
+
+      if (record.takeProfitOnGrid) {
+        return <span>{'Pnl: ' + record.takeProfitOnPnl + ' ' + record.quoteCurrency}</span>
       }
 
       return '-'

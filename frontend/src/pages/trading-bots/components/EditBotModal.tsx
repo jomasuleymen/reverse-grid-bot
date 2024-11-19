@@ -23,8 +23,13 @@ const EditBotFormItems: (FormItemType | FormItemType[])[] = [
     children: <CustomInputNumber />,
   },
   {
-    label: 'Триггер',
+    label: 'Старт триггер',
     name: 'triggerPrice',
+    children: <CustomInputNumber />,
+  },
+  {
+    label: 'Тейк-профит Pnl',
+    name: 'takeProfitOnPnl',
     children: <CustomInputNumber />,
   },
   [

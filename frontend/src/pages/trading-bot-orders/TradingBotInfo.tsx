@@ -60,6 +60,11 @@ const getDescriptionItems = (bot: TradingBot): DescriptionsProps['items'] => [
     span: 2,
   },
   {
+    label: 'Тейк-профит на Pnl',
+    children: bot.takeProfitOnPnl ? `${bot.takeProfitOnPnl} ${bot.quoteCurrency}` : '-',
+    span: 2,
+  },
+  {
     label: 'Создан',
     children: formatDate(bot.createdAt, { showTime: true }),
   },

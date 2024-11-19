@@ -36,6 +36,10 @@ export class StartBotDto {
 
 	@IsNumber()
 	@IsOptional()
+	takeProfitOnPnl?: number;
+
+	@IsNumber()
+	@IsOptional()
 	@IsPositive()
 	takeProfit?: number;
 

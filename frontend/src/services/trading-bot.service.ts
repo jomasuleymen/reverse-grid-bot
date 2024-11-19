@@ -22,6 +22,7 @@ export type TradingBotConfig = {
   stopReason?: string
   takeProfitOnGrid?: number
   takeProfit?: number
+  takeProfitOnPnl?: number
   triggerPrice?: number
   tradeOnStart?: boolean
 }
