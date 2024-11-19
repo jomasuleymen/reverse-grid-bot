@@ -28,7 +28,7 @@ const EditBotFormItems: (FormItemType | FormItemType[])[] = [
     children: <CustomInputNumber />,
   },
   {
-    label: 'Тейк-профит Pnl',
+    label: 'Тейк-профит на Pnl',
     name: 'takeProfitOnPnl',
     children: <CustomInputNumber />,
   },
@@ -97,6 +97,7 @@ const EditBotModal: React.FC<Props> = ({ botId }) => {
         gridVolume: data.gridVolume,
         takeProfitOnGrid: data.takeProfitOnGrid,
         takeProfit: data.takeProfit,
+        takeProfitOnPnl: data.takeProfitOnPnl,
       })
     }
   }, [data])

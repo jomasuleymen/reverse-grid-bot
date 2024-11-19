@@ -143,10 +143,10 @@ export function calculatePositionsSummary<T extends CalculatePnlOrder>(
 			}
 		}
 
-		totalFees -= order.fee;
+		totalFees += order.fee;
 
 		const positionUnrealizedPnl = calculateUnrealizedPnl(order.avgPrice);
-		const positionRealizedPnl = totalProfit + totalFees;
+		const positionRealizedPnl = totalProfit - totalFees;
 		const positionNetPnl = positionUnrealizedPnl + positionRealizedPnl;
 
 		statistics.minPnl = Math.min(positionNetPnl, statistics.minPnl);
@@ -177,7 +177,7 @@ export function calculatePositionsSummary<T extends CalculatePnlOrder>(
 	}
 
 	const unrealizedPnl = calculateUnrealizedPnl();
-	const realizedPnl = totalProfit + totalFees;
+	const realizedPnl = totalProfit - totalFees;
 	const netPnl = realizedPnl + unrealizedPnl;
 
 	return {
