@@ -41,8 +41,13 @@ type FormItemType = FormItemProps<TCreateTradingBotConfigForm>
 const StartBotFormItems: (FormItemType | FormItemType[])[] = [
   ...BotConfigFormItems,
   {
-    label: 'Триггер',
+    label: 'Старт триггер',
     name: 'triggerPrice',
+    children: <CustomInputNumber />,
+  },
+  {
+    label: 'Тейк-профит на Pnl',
+    name: 'takeProfitOnPnl',
     children: <CustomInputNumber />,
   },
   [
@@ -161,8 +166,6 @@ const StartBotModal: React.FC = () => {
       <b>Объем сетки:</b> {config.gridVolume + ' ' + config.baseCurrency}
       <br />
       <b>Шаг сетки:</b> {config.gridStep + ' ' + config.quoteCurrency}
-      <br />
-      <b>Тейк-профит на сетке:</b> {config.takeProfitOnGrid}
     </>
   )
 

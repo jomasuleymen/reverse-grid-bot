@@ -55,6 +55,7 @@ export interface ITradingBotConfig {
 	baseCurrency: string;
 	quoteCurrency: string;
 	takeProfitOnGrid?: number;
+	takeProfitOnPnl?: number;
 	tradeOnStart?: boolean;
 	takeProfit?: number;
 	triggerPrice?: number;
