@@ -171,7 +171,7 @@ function getExpandDetails(record: OrderWithSummary, configs: Props['configs']) {
     'Нереализованная прибыль': record.pnl.unrealizedPnl.toFixed(2) + ' ' + configs.quoteCurrency,
     'Реализованная прибыль': record.pnl.realizedPnl.toFixed(2) + ' ' + configs.quoteCurrency,
     'Сумма комиссии': record.pnl.fee.toFixed(2) + ' ' + configs.quoteCurrency,
-    Убыток: record.pnl.totalProfit.toFixed(2) + ' ' + configs.quoteCurrency,
+    Прибыль: record.pnl.totalProfit.toFixed(2) + ' ' + configs.quoteCurrency,
     Покупки: record.buyOrdersCount,
     Продажи: record.sellOrdersCount,
   }
