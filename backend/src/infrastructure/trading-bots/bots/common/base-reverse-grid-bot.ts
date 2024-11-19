@@ -601,7 +601,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		}
 	}
 	private isTakeProfitTriggered(): boolean {
-		if (!this.marketData.currentPrice) {
+		if (!this.marketData.currentPrice || !this.orders.length) {
 			return false;
 		}
 
@@ -627,8 +627,26 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			const ordersSummary = calculatePositionsSummary(this.orders, {
 				currentPrice: this.marketData.currentPrice,
 			});
+
+			const firstOrder = this.orders[0]!;
+			const feePercent =
+				(firstOrder.fee / (firstOrder.avgPrice * firstOrder.quantity)) *
+				100;
+
+			let allQuantity = 0;
+			for (const order of this.orders) {
+				if (order.side == this.TRIGGER_SIDE)
+					allQuantity += order.quantity;
+				else allQuantity -= order.quantity;
+			}
+
+			allQuantity = Math.abs(allQuantity);
+			const remainComissions =
+				(allQuantity * this.marketData.currentPrice * feePercent) / 100;
+
 			const isTriggered =
-				ordersSummary.pnl.netPnl >= this.config.takeProfitOnPnl;
+				ordersSummary.pnl.netPnl - remainComissions >=
+				this.config.takeProfitOnPnl;
 
 			if (isTriggered) {
 				return true;
