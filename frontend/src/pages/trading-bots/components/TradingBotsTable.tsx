@@ -101,31 +101,32 @@ const getColumns = (options: Props['options']): ColumnsType<ColumnType> => [
     title: 'Тейк-профит',
     align: 'center',
     render: (value, record) => {
-      if (record.takeProfitOnGrid && record.takeProfit) {
-        return (
-          <span>
-            {'Сетка: ' + record.takeProfitOnGrid}
-            <br />
-            {'Цена: ' + record.takeProfit + ' ' + record.quoteCurrency}
-            <br />
-            {'Pnl: ' + record.takeProfitOnPnl + ' ' + record.quoteCurrency}
-          </span>
-        )
-      }
+      const takeProfitData = []
 
       if (record.takeProfitOnGrid) {
-        return <span>{'Сетка: ' + record.takeProfitOnGrid}</span>
+        takeProfitData.push(`Сетка: ${record.takeProfitOnGrid}`)
       }
 
       if (record.takeProfit) {
-        return <span>{'Цена: ' + record.takeProfit + ' ' + record.quoteCurrency}</span>
+        takeProfitData.push(`Цена: ${record.takeProfit} ${record.quoteCurrency}`)
       }
 
-      if (record.takeProfitOnGrid) {
-        return <span>{'Pnl: ' + record.takeProfitOnPnl + ' ' + record.quoteCurrency}</span>
+      if (record.takeProfitOnPnl) {
+        takeProfitData.push(`Pnl: ${record.takeProfitOnPnl} ${record.quoteCurrency}`)
       }
 
-      return '-'
+      return takeProfitData.length > 0 ? (
+        <span>
+          {takeProfitData.map((item, index) => (
+            <React.Fragment key={index}>
+              {item}
+              <br />
+            </React.Fragment>
+          ))}
+        </span>
+      ) : (
+        '-'
+      )
     },
   },
   {
