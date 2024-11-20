@@ -54,14 +54,14 @@ export enum TradePosition {
 export interface ITradingBotConfig {
 	baseCurrency: string;
 	quoteCurrency: string;
-	takeProfitOnGrid?: number;
-	takeProfitOnPnl?: number;
-	tradeOnStart?: boolean;
-	takeProfit?: number;
-	triggerPrice?: number;
 	gridStep: number;
 	gridVolume: number;
 	position: TradePosition;
+	triggerPrice?: number;
+	takeProfit?: number;
+	takeProfitOnGrid?: number;
+	takeProfitOnPnl?: number;
+	tradeOnStart?: boolean;
 }
 
 export interface IExchangeCredentials {

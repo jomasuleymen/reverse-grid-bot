@@ -1,5 +1,6 @@
+import { TradePosition } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { Transform } from 'class-transformer';
-import { IsInt, IsNumber, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNumber, IsString, Min } from 'class-validator';
 
 const minTimestamp = new Date('2010-01-01').getTime();
 
@@ -15,6 +16,9 @@ export class StartTradingBotSimulatorDto {
 
 	@IsNumber({}, { message: 'Объём сетки должен быть числом.' })
 	gridVolume: number;
+
+	@IsEnum(TradePosition)
+	position: TradePosition;
 
 	@IsInt()
 	@Min(minTimestamp)

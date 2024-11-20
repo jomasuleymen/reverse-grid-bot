@@ -1,5 +1,6 @@
 import $api from '@/utils/http'
 import { ExchangeCredentials } from './exchanges.service'
+import { IPositionSummary } from './orders-summary.service'
 
 const TRADING_BOT_ENDPOINT = '/trading-bots'
 const TRADING_BOT_CONFIGS_ENDPOINT = TRADING_BOT_ENDPOINT + '-configs'
@@ -90,28 +91,6 @@ export interface ITradingBotFilter {
 export interface IStartBotOptions {
   credentialsId: number
   configId: number
-}
-
-interface IPnl {
-  fee: number
-  totalProfit: number
-  realizedPnl: number
-  unrealizedPnl: number
-  netPnl: number
-}
-
-interface IStatistics {
-  maxPnl: number
-  minPnl: number
-}
-
-interface IPositionSummary {
-  pnl: IPnl
-  statistics: IStatistics
-  buyOrdersCount: number
-  sellOrdersCount: number
-  isMaxPnl?: boolean
-  isMinPnl?: boolean
 }
 
 export type OrderWithSummary = TradingBotOrder & IPositionSummary

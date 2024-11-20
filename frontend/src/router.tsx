@@ -11,6 +11,9 @@ const TradingBotConfigs = React.lazy(() => import('@/pages/bot-configs'))
 const TradingBotAccounts = React.lazy(() => import('@/pages/exchange-credentials'))
 const TradingBots = React.lazy(() => import('@/pages/trading-bots'))
 const TradingBotOrders = React.lazy(() => import('@/pages/trading-bot-orders'))
+const TradingBotSimulatorOrders = React.lazy(
+  () => import('@/pages/trading-bot-simulators/pages/orders'),
+)
 const TradingBotSimulators = React.lazy(() => import('@/pages/trading-bot-simulators'))
 const LoginPage = React.lazy(() => import('@/pages/login'))
 
@@ -52,10 +55,20 @@ export const routes: Route[] = [
     ],
   },
   {
-    label: 'Аналитика',
+    label: 'Симулятор',
     path: '/trading-bot-simulators',
-    protected: true,
-    element: TradingBotSimulators,
+    children: [
+      {
+        path: '',
+        protected: true,
+        element: TradingBotSimulators,
+      },
+      {
+        path: ':botId/orders',
+        protected: true,
+        element: TradingBotSimulatorOrders,
+      },
+    ],
   },
 ]
 

@@ -137,7 +137,7 @@ export class KlineService {
 				.orIgnore() // On conflict do nothing
 				.execute();
 
-			this.logger.info('Saved fetched klines to database', {
+			this.logger.info('Saving fetched klines', {
 				symbol,
 				currentStartTime: this.formatTimestamp(currentStartTime),
 				endTime: this.formatTimestamp(endTime),

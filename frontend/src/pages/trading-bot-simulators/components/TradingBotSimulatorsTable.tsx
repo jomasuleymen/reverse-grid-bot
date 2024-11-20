@@ -1,11 +1,14 @@
 import DataTable from '@/components/DataTable'
 import { SERVICES } from '@/services'
+import { TradePosition } from '@/services/trading-bot.service'
 import { TradingBotSimulator, TradingBotSimulatorStatus } from '@/services/trading-services.service'
 import { formatDate } from '@/utils'
-import { Typography } from 'antd'
+import { useQueryClient } from '@tanstack/react-query'
+import { Space, Tag, Typography } from 'antd'
 import { ColumnsType } from 'antd/es/table'
 import { BaseType } from 'antd/es/typography/Base'
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { TRADING_BOT_SIMULATORS_QUERY_KEY } from '..'
 
 const { Text } = Typography
@@ -87,6 +90,19 @@ const getColumns = (): ColumnsType<ColumnType> => [
     },
   },
   {
+    title: 'Позиция',
+    dataIndex: 'position',
+    align: 'center',
+    render(value) {
+      if (!value) return
+      return (
+        <Tag color={value === TradePosition.LONG ? 'green' : 'red'}>
+          {value === TradePosition.LONG ? 'LONG' : 'SHORT'}
+        </Tag>
+      )
+    },
+  },
+  {
     title: 'Статус',
     dataIndex: 'status',
     align: 'center',
@@ -100,57 +116,47 @@ const getColumns = (): ColumnsType<ColumnType> => [
       )
     },
   },
+  {
+    title: 'Действия',
+    key: 'action',
+    render: (_, record: ColumnType) => (
+      <Space>
+        {[TradingBotSimulatorStatus.Completed].includes(record.status) && (
+          <Link className="text-blue-500" to={`${record.id}/orders`}>
+            Детали
+          </Link>
+        )}
+      </Space>
+    ),
+    align: 'center',
+  },
 ]
 
-type Props = {}
+const TradingBotSimulatorsTable: React.FC = () => {
+  const queryClient = useQueryClient()
 
-function getExpandDetails(record: TradingBotSimulator) {
-  const data = {
-    '------ Цена ------': '',
-    'Цена открытия': record.result.openPrice,
-    'Цена закрытия': record.result.closePrice,
-    'Наивысшая цена': record.result.highestPrice,
-    'Наименьшая цена': record.result.lowestPrice,
-    '------ Доходность ------': '',
-    PnL: record.result.PnL.toFixed(2) + ' ' + record.quoteCurrency,
-    'Максимальный PnL': record.result.maxPnL.toFixed(2) + ' ' + record.quoteCurrency,
-    'Нереализованный PnL': record.result.unrealizedPnL.toFixed(2) + ' ' + record.quoteCurrency,
-    'Реализованный PnL': record.result.realizedPnL.toFixed(2) + ' ' + record.quoteCurrency,
-    'Общая комиссия': record.result.totalFee.toFixed(2) + ' ' + record.quoteCurrency,
-    'Общая убытка': record.result.totalProfit.toFixed(2) + ' ' + record.quoteCurrency,
-    '------ Операций ------': '',
-    'Разница операций': Math.abs(record.result.buyCount - record.result.sellCount),
-    'Количество покупок': record.result.buyCount,
-    'Количество продаж': record.result.sellCount,
-  }
-
-  return Object.entries(data).map(([key, value]) => (
-    <div key={key}>
-      <b>
-        {key}
-        {value && ':'}
-      </b>{' '}
-      {value && value}
-    </div>
-  ))
-}
-
-const TradingBotSimulatorsTable: React.FC<Props> = () => {
   return (
     <DataTable
       fetchData={() => SERVICES.TRADING_SERVICES.TRADING_BOT_SIMULATOR.fetchAll()}
       queryKey={TRADING_BOT_SIMULATORS_QUERY_KEY}
       parseDataSource={parseDataSource}
       columns={getColumns()}
-      tableProps={{
-        expandable: {
-          expandedRowRender: (record) => getExpandDetails(record),
-          rowExpandable: (record) => {
-            return !!record.result
-          },
-        },
-      }}
       refetchOnWindowFocus={true}
+      refetchInterval={2000}
+      shouldRefetch={() => {
+        const activeTradingBots =
+          (queryClient.getQueryState(TRADING_BOT_SIMULATORS_QUERY_KEY)?.data as Array<any>) || []
+
+        const data = activeTradingBots.slice(0, 5)
+
+        return (
+          data.findIndex(
+            (bot) =>
+              bot.status === TradingBotSimulatorStatus.Idle ||
+              bot.status === TradingBotSimulatorStatus.InProgress,
+          ) !== -1
+        )
+      }}
     />
   )
 }

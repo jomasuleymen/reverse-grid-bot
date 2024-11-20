@@ -1,23 +1,21 @@
 import ErrorDisplay from '@/components/ErrorDisplay'
+import TradingBotOrdersTable from '@/components/trading-bot/TradingBotOrdersTable'
 import { SERVICES } from '@/services'
 import { useQuery } from '@tanstack/react-query'
 import { Space, Spin } from 'antd'
 import React, { memo } from 'react'
 import { useParams } from 'react-router'
-import TradingBotOrdersTable from '../../components/trading-bot/TradingBotOrdersTable'
 import TradingBotInfo from './TradingBotInfo'
 
-type Props = {}
-
-const TradingBotOrdersPage: React.FC<Props> = ({}) => {
+const SimulatorBotOrdersPage: React.FC = () => {
   const { botId } = useParams()
 
   const { isPending, isSuccess, data, isError, error } = useQuery({
-    queryKey: ['trading-bot-with-summaries', botId],
+    queryKey: ['trading-simulator-bot-with-summaries', botId],
     queryFn: async () => {
       const [bot, orders] = await Promise.all([
-        SERVICES.TRADING_BOT.fetchById(botId!),
-        SERVICES.TRADING_BOT.ORDERS.getOrdersWithSummary(botId!),
+        SERVICES.TRADING_SERVICES.TRADING_BOT_SIMULATOR.fetchById(botId!),
+        SERVICES.TRADING_SERVICES.TRADING_BOT_SIMULATOR.fetchOrdersSummaryById(botId!),
       ])
       return { bot, orders }
     },
@@ -36,6 +34,9 @@ const TradingBotOrdersPage: React.FC<Props> = ({}) => {
             data={orders}
             isPending={isPending}
             isSuccess={isSuccess}
+            hiddenColumns={{
+              orderId: true,
+            }}
           />
         </Space>
       )}
@@ -44,4 +45,4 @@ const TradingBotOrdersPage: React.FC<Props> = ({}) => {
   )
 }
 
-export default memo(TradingBotOrdersPage)
+export default memo(SimulatorBotOrdersPage)

@@ -1,4 +1,6 @@
 import $api from '@/utils/http'
+import { IPositionSummary } from './orders-summary.service'
+import { TradePosition, TradingOrderSide } from './trading-bot.service'
 
 const TRADING_SERVICES_ENDPOINT = '/trading-services'
 
@@ -15,28 +17,33 @@ export type TradingBotSimulator = {
   quoteCurrency: string
   gridStep: number
   gridVolume: number
+  position: TradePosition
   startTime: number
   endTime: number
   status: TradingBotSimulatorStatus
-  result: TradingBotSimulatorResult
+  stats: TradingBotSimulatorStats
+  orders: TradingBotSimulatorOrder[]
   createdAt: Date
 }
 
-export type TradingBotSimulatorResult = {
+export type TradingBotSimulatorStats = {
   id: number
-  buyCount: number
-  sellCount: number
   openPrice: number
   closePrice: number
   highestPrice: number
   lowestPrice: number
-  totalProfit: number
-  totalFee: number
-  realizedPnL: number
-  unrealizedPnL: number
-  PnL: number
-  maxPnL: number
   createdAt: Date
+}
+
+export type TradingBotSimulatorOrder = {
+  id: number
+  feeCurrency: string
+  avgPrice: number
+  triggerPrice: number
+  quantity: number
+  side: TradingOrderSide
+  fee: number
+  createdDate: Date
 }
 
 export type CreateTradingBotSimulator = Omit<
@@ -44,17 +51,31 @@ export type CreateTradingBotSimulator = Omit<
   'id' | 'status' | 'result' | 'createdAt'
 >
 
+export type SimulatorOrderWithSummary = TradingBotSimulatorOrder & IPositionSummary
+
+export type SimulatorOrdersWithSummary = IPositionSummary & {
+  positions: SimulatorOrderWithSummary[]
+}
+
 const TRADING_BOT_SIMULATORS_API = {
+  endPoint: TRADING_SERVICES_ENDPOINT + '/reverse-grid-bot-simulators',
+
   async fetchAll() {
+    return await $api.get<TradingBotSimulator[]>(this.endPoint).then((res) => res.data)
+  },
+
+  async fetchById(id: number | string) {
+    return await $api.get<TradingBotSimulator>(`${this.endPoint}/${id}`).then((res) => res.data)
+  },
+
+  async fetchOrdersSummaryById(id: number | string) {
     return await $api
-      .get<TradingBotSimulator[]>(TRADING_SERVICES_ENDPOINT + '/reverse-grid-bot-simulator')
+      .get<SimulatorOrdersWithSummary>(`${this.endPoint}/${id}/orders-summary`)
       .then((res) => res.data)
   },
 
   async create(data: CreateTradingBotSimulator) {
-    return await $api
-      .post(TRADING_SERVICES_ENDPOINT + '/reverse-grid-bot-simulator', data)
-      .then((res) => res.data)
+    return await $api.post(this.endPoint, data).then((res) => res.data)
   },
 }
 

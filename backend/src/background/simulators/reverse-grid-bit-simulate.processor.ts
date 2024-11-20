@@ -1,27 +1,23 @@
 import { DATABASES } from '@/configs/typeorm';
 import { IReverseGridBotSimulateQueueData } from '@/domain/interfaces/trading-bots/trading-bot-job.interface';
-import { TradePosition } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { TradingBotSimulatorStatus } from '@/domain/interfaces/trading-services/trading-services.interface';
 import { QUEUES } from '@/infrastructure/services/bull/bull.const';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
-import { ReverseGridBotConfigEntity } from '@/infrastructure/trading-services/entities/reverse-grid-bot-configs.service-entity';
-import { ReverseGridBotStatsEntity } from '@/infrastructure/trading-services/entities/reverse-grid-bot-stats.service-entity';
+import { TradingBotSimulatorEntity } from '@/infrastructure/trading-services/entities/trading-bot-simulator.service-entity';
 import { SimulateReverseGridBotService } from '@/infrastructure/trading-services/services/simulate-reverse-grid-bot.service';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job } from 'bullmq';
-import { Equal, IsNull, Not, Repository } from 'typeorm';
+import { Equal, Repository } from 'typeorm';
 
 @Processor(QUEUES.REVERSE_GRID_BOT_SIMULATE, { concurrency: 1 })
 export class ReverseGridBotSimulateConsumer extends WorkerHost {
 	constructor(
 		private readonly loggerService: LoggerService,
 		private readonly simulatorService: SimulateReverseGridBotService,
-		@InjectRepository(ReverseGridBotStatsEntity, DATABASES.SERVICE_DB)
-		private readonly statsRepo: Repository<ReverseGridBotStatsEntity>,
-		@InjectRepository(ReverseGridBotConfigEntity, DATABASES.SERVICE_DB)
-		private readonly tradingSimulatorConfigsRepo: Repository<ReverseGridBotConfigEntity>,
+		@InjectRepository(TradingBotSimulatorEntity, DATABASES.SERVICE_DB)
+		private readonly botSimulatorsRepo: Repository<TradingBotSimulatorEntity>,
 	) {
 		super();
 	}
@@ -29,17 +25,17 @@ export class ReverseGridBotSimulateConsumer extends WorkerHost {
 	async process(job: Job<IReverseGridBotSimulateQueueData>): Promise<any> {
 		const { configId } = job.data;
 
-		const config = await this.tradingSimulatorConfigsRepo.findOne({
+		const botConfigs = await this.botSimulatorsRepo.findOne({
 			where: {
 				id: Equal(configId),
 			},
 			relations: {
-				result: true,
+				stats: true,
 			},
 		});
 
-		if (!config) {
-			throw new BadRequestException('Configuration now found');
+		if (!botConfigs) {
+			throw new BadRequestException('Configuration for bot now found');
 		}
 
 		const {
@@ -49,74 +45,36 @@ export class ReverseGridBotSimulateConsumer extends WorkerHost {
 			gridVolume,
 			startTime,
 			endTime,
-			status,
-		} = config;
+			position,
+		} = botConfigs;
 
-		const alreadyProcessedSameConfig =
-			await this.tradingSimulatorConfigsRepo.findOne({
-				where: {
-					baseCurrency,
-					quoteCurrency,
-					startTime,
-					endTime,
-					gridStep: config.gridStep,
-					gridVolume: config.gridVolume,
-					result: Not(IsNull()),
-					status: TradingBotSimulatorStatus.Completed,
-				},
-				relations: {
-					result: true,
-				},
-			});
-
-		if (alreadyProcessedSameConfig) {
-			return await this.tradingSimulatorConfigsRepo.save({
-				id: config.id,
-				status: TradingBotSimulatorStatus.Completed,
-				result: alreadyProcessedSameConfig.result,
-			});
-		}
-
-		await this.tradingSimulatorConfigsRepo.update(config.id, {
+		await this.botSimulatorsRepo.update(botConfigs.id, {
 			status: TradingBotSimulatorStatus.InProgress,
 		});
 
-		const result = await this.simulatorService.simulateReverseGridBot(
-			{
-				baseCurrency,
-				quoteCurrency,
-				gridVolume,
-				gridStep,
-				takeProfitOnGrid: 0,
-				takeProfit: 0,
-				position: TradePosition.LONG,
-			},
-			startTime,
-			endTime,
-		);
+		const { stats, orders } =
+			await this.simulatorService.simulateReverseGridBot(
+				{
+					baseCurrency,
+					quoteCurrency,
+					gridVolume,
+					gridStep,
+					position,
+				},
+				startTime,
+				endTime,
+			);
 
-		const entity: Omit<ReverseGridBotStatsEntity, 'id' | 'createdAt'> = {
-			buyCount: result.buyCount,
-			closePrice: result.closePrice,
-			highestPrice: result.highestPrice,
-			lowestPrice: result.lowestPrice,
-			maxPnL: result.maxPnL,
-			openPrice: result.openPrice,
-			PnL: result.PnL,
-			realizedPnL: result.realizedPnL,
-			sellCount: result.sellCount,
-			totalFee: result.totalFee,
-			totalProfit: result.totalProfit,
-			unrealizedPnL: result.unrealizedPnL,
-			configs: [config],
-		};
-
-		const resultEntity = await this.statsRepo.save(entity);
-
-		return await this.tradingSimulatorConfigsRepo.save({
-			id: config.id,
+		return await this.botSimulatorsRepo.save({
+			id: botConfigs.id,
 			status: TradingBotSimulatorStatus.Completed,
-			result: resultEntity,
+			stats: {
+				openPrice: stats.openPrice,
+				highestPrice: stats.highestPrice,
+				lowestPrice: stats.lowestPrice,
+				closePrice: stats.closePrice,
+			},
+			orders,
 		});
 	}
 
