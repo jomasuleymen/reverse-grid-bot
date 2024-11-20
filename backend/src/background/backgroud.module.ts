@@ -15,7 +15,8 @@ const IMPORT_PROVIDERS_BY_TYPE_ENV = () => {
 	if (isInitTypeEnv(TYPE_ENV.REVERSE_GRID_BOTS)) {
 		processes.push(TradingBotStartConsumer, TradingBotStopConsumer);
 	}
-	if (isInitTypeEnv(TYPE_ENV.REVERSE_GRID_BOTS)) {
+
+	if (isInitTypeEnv(TYPE_ENV.SIMULATORS)) {
 		processes.push(ReverseGridBotSimulateConsumer);
 	}
 

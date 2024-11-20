@@ -88,10 +88,6 @@ const StartBotSimulatorModal: React.FC = () => {
       <b>Объем сетки:</b> {config.gridVolume + ' ' + config.baseCurrency}
       <br />
       <b>Шаг сетки:</b> {config.gridStep + ' ' + config.quoteCurrency}
-      <br />
-      <b>Тейк-профит на сетке:</b> {config.takeProfitOnGrid + ' ' + config.quoteCurrency}
-      <br />
-      <b>Тейк-профит:</b> {config.takeProfit && config.takeProfit + ' ' + config.quoteCurrency}
     </>
   )
 
