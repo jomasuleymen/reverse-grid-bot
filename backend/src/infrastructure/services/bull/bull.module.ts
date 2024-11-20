@@ -1,5 +1,5 @@
 import { getRedisOptions } from '@/configs/redis';
-import { BullModule } from '@nestjs/bullmq';
+import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { queueInjectionList } from './bull.const';
@@ -10,14 +10,13 @@ import { queueInjectionList } from './bull.const';
 			imports: [],
 			inject: [ConfigService],
 			useFactory: async (config: ConfigService) => ({
-				connection: {
+				redis: {
 					...getRedisOptions(config),
 				},
 				defaultJobOptions: {
 					removeOnComplete: true,
 					removeOnFail: true,
 				},
-				prefix: 'TRADING_BOT',
 			}),
 		}),
 		BullModule.registerQueue(...queueInjectionList()),

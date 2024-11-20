@@ -48,6 +48,10 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 			socksAgent = new SocksProxyAgent(
 				`socks5://${this.proxy.login}:${this.proxy.password}@${this.proxy.ip}:${this.proxy.port.socket}`,
 			);
+
+			this.logger.info('Bybit connection with proxy', {
+				ip: this.proxy.ip,
+			});
 		}
 
 		this.restClient = new RestClientV5(
@@ -117,11 +121,11 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		});
 
 		this.wsClient.on('reconnect', (data) => {
-			this.logger.info('Bybit private ws reconnecting.... ');
+			this.logger.info('Bybit private ws reconnecting...');
 		});
 
 		this.wsClient.on('reconnected', (data) => {
-			this.logger.info('Bybit private ws reconnected ');
+			this.logger.info('Bybit private ws reconnected');
 		});
 	}
 

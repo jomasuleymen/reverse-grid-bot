@@ -8,11 +8,11 @@ import {
 	ITradingBot,
 	TradingBotSnapshot,
 } from '@/domain/interfaces/trading-bots/trading-bot.interface';
-import { InjectQueue } from '@nestjs/bullmq';
+import { InjectQueue } from '@nestjs/bull';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Queue } from 'bullmq';
+import { Queue } from 'bull';
 import { Equal, FindOptionsWhere, Not, Or, Repository } from 'typeorm';
 import { ExchangeCredentialsService } from '../exchanges/exchange-credentials/exchange-credentials.service';
 import { QUEUES } from '../services/bull/bull.const';
@@ -59,15 +59,29 @@ export class TradingBotService {
 			takeProfitOnPnl: options.takeProfitOnPnl,
 		});
 
-		await this.tradingBotStartQueue.add('start', {
-			botId: botEntity.id,
-		});
+		await this.tradingBotStartQueue.add(
+			{
+				botId: botEntity.id,
+			},
+			{
+				jobId: `start_bot_${botEntity.id}`,
+				removeOnComplete: true,
+				removeOnFail: true,
+			},
+		);
 	}
 
 	async stopBot(userId: number, botId: number): Promise<void> {
-		await this.tradingBotStopQueue.add('stop', {
-			botId,
-		});
+		await this.tradingBotStopQueue.add(
+			{
+				botId,
+			},
+			{
+				jobId: `stop_bot_${botId}`,
+				removeOnComplete: true,
+				removeOnFail: true,
+			},
+		);
 	}
 
 	private async getCredentials(userId: number, credentialsId: number) {

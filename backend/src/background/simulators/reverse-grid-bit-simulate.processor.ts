@@ -2,26 +2,28 @@ import { DATABASES } from '@/configs/typeorm';
 import { IReverseGridBotSimulateQueueData } from '@/domain/interfaces/trading-bots/trading-bot-job.interface';
 import { TradingBotSimulatorStatus } from '@/domain/interfaces/trading-services/trading-services.interface';
 import { QUEUES } from '@/infrastructure/services/bull/bull.const';
+import { DefaultBullHandlers } from '@/infrastructure/services/bull/bull.handlers';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { TradingBotSimulatorEntity } from '@/infrastructure/trading-services/entities/trading-bot-simulator.service-entity';
 import { SimulateReverseGridBotService } from '@/infrastructure/trading-services/services/simulate-reverse-grid-bot.service';
-import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { Process, Processor } from '@nestjs/bull';
 import { BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Job } from 'bullmq';
+import { Job } from 'bull';
 import { Equal, Repository } from 'typeorm';
 
-@Processor(QUEUES.REVERSE_GRID_BOT_SIMULATE, { concurrency: 1 })
-export class ReverseGridBotSimulateConsumer extends WorkerHost {
+@Processor(QUEUES.REVERSE_GRID_BOT_SIMULATE)
+export class ReverseGridBotSimulateConsumer extends DefaultBullHandlers {
 	constructor(
-		private readonly loggerService: LoggerService,
+		readonly logger: LoggerService,
 		private readonly simulatorService: SimulateReverseGridBotService,
 		@InjectRepository(TradingBotSimulatorEntity, DATABASES.SERVICE_DB)
 		private readonly botSimulatorsRepo: Repository<TradingBotSimulatorEntity>,
 	) {
-		super();
+		super(logger);
 	}
 
+	@Process({ concurrency: 1 })
 	async process(job: Job<IReverseGridBotSimulateQueueData>): Promise<any> {
 		const { configId } = job.data;
 
@@ -76,13 +78,5 @@ export class ReverseGridBotSimulateConsumer extends WorkerHost {
 			},
 			orders,
 		});
-	}
-
-	@OnWorkerEvent('failed')
-	async failed(failedReason: unknown) {
-		this.loggerService.error(
-			'Failed while simulating the reverse grid bot',
-			failedReason,
-		);
 	}
 }

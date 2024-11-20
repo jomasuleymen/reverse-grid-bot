@@ -3,28 +3,30 @@ import { IStartTradingBotQueueData } from '@/domain/interfaces/trading-bots/trad
 import { BotState } from '@/domain/interfaces/trading-bots/trading-bot.interface';
 import { ExchangeCredentialsService } from '@/infrastructure/exchanges/exchange-credentials/exchange-credentials.service';
 import { QUEUES } from '@/infrastructure/services/bull/bull.const';
+import { DefaultBullHandlers } from '@/infrastructure/services/bull/bull.handlers';
 import LoggerService from '@/infrastructure/services/logger/logger.service';
 import TelegramService from '@/infrastructure/services/telegram/telegram.service';
 import { TradingBotOrdersService } from '@/infrastructure/trading-bots/trading-bot-orders.service';
 import { TradingBotService } from '@/infrastructure/trading-bots/trading-bots.service';
 import { readProxies } from '@/infrastructure/utils/proxy.util';
 import { calculatePositionsSummary } from '@/infrastructure/utils/trading-orders.util';
-import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { Process, Processor } from '@nestjs/bull';
 import { BadRequestException } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Job } from 'bull';
 
 @Processor(QUEUES.TRADING_BOT_START)
-export class TradingBotStartConsumer extends WorkerHost {
+export class TradingBotStartConsumer extends DefaultBullHandlers {
 	constructor(
-		private readonly loggerService: LoggerService,
+		readonly logger: LoggerService,
 		private readonly tradingBotService: TradingBotService,
 		private readonly botOrdersService: TradingBotOrdersService,
 		private readonly exchangeCredentialsService: ExchangeCredentialsService,
 		private readonly telegramService: TelegramService,
 	) {
-		super();
+		super(logger);
 	}
 
+	@Process()
 	async process(job: Job<IStartTradingBotQueueData>): Promise<any> {
 		const { botId } = job.data;
 
@@ -214,7 +216,7 @@ export class TradingBotStartConsumer extends WorkerHost {
 					},
 				})
 				.catch(async (err) => {
-					this.loggerService.error('Error while starting bot', err);
+					this.logger.error('Error while starting bot', err);
 					await this.tradingBotService.update(botId, {
 						state: BotState.Errored,
 						stoppedAt: new Date(),
@@ -229,10 +231,5 @@ export class TradingBotStartConsumer extends WorkerHost {
 			});
 		}
 		return {};
-	}
-
-	@OnWorkerEvent('failed')
-	async failed(failedReason: unknown) {
-		this.loggerService.error('Failed starting trading bot', failedReason);
 	}
 }

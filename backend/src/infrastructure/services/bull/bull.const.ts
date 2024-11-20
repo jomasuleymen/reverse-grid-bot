@@ -1,4 +1,4 @@
-import { RegisterQueueAsyncOptions } from '@nestjs/bullmq';
+import { BullModuleOptions } from '@nestjs/bull';
 
 export const QUEUES = {
 	TRADING_BOT_START: 'TRADING_BOT_START',
@@ -6,7 +6,7 @@ export const QUEUES = {
 	REVERSE_GRID_BOT_SIMULATE: 'REVERSE_GRID_BOT_SIMULATE',
 };
 
-export const queueInjectionList = (): RegisterQueueAsyncOptions[] => {
+export const queueInjectionList = (): BullModuleOptions[] => {
 	return Object.values(QUEUES).map((queue) => {
 		return { name: queue };
 	});

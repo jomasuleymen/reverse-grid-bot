@@ -20,6 +20,12 @@ const IMPORT_PROVIDERS_BY_TYPE_ENV = () => {
 		processes.push(ReverseGridBotSimulateConsumer);
 	}
 
+	console.log({
+		type: process.env.TYPE_ENV,
+		processes,
+		schedules,
+	});
+
 	return [...processes, ...schedules];
 };
 

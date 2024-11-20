@@ -1,10 +1,10 @@
 import { DATABASES } from '@/configs/typeorm';
 import { IReverseGridBotSimulateQueueData } from '@/domain/interfaces/trading-bots/trading-bot-job.interface';
 import { TradingBotSimulatorStatus } from '@/domain/interfaces/trading-services/trading-services.interface';
-import { InjectQueue } from '@nestjs/bullmq';
+import { InjectQueue } from '@nestjs/bull';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Queue } from 'bullmq';
+import { Queue } from 'bull';
 import { Equal, Repository } from 'typeorm';
 import { QUEUES } from '../services/bull/bull.const';
 import { StartTradingBotSimulatorDto } from './dto/start-trading-bot-simulator.dto';
@@ -34,9 +34,17 @@ export class TradingServicesService {
 			status: TradingBotSimulatorStatus.Idle,
 		});
 
-		await this.reverseGridBotSimulatorQueue.add('start', {
-			configId: configEntity.id,
-		});
+		await this.reverseGridBotSimulatorQueue.add(
+			{
+				configId: configEntity.id,
+			},
+			{
+				jobId: `reverse_grid_bot_simulator_${configEntity.id}`,
+				attempts: 3,
+				removeOnComplete: true,
+				removeOnFail: true,
+			},
+		);
 	}
 
 	async findSimulators(userId: number) {
