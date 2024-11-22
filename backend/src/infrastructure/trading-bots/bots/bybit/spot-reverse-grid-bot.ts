@@ -9,10 +9,12 @@ import { BybitService } from '@/infrastructure/exchanges/modules/bybit/bybit.ser
 import { retryWithFallback } from '@/infrastructure/utils/request.utils';
 import { Injectable, Scope } from '@nestjs/common';
 import {
+	AccountOrderV5,
 	OrderParamsV5,
 	RestClientV5,
 	WalletBalanceV5,
 	WebsocketClient,
+	WSAccountOrderV5,
 } from 'bybit-api';
 import { Agent } from 'http';
 import { HttpsProxyAgent } from 'https-proxy-agent';
@@ -226,13 +228,31 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 		return params;
 	}
 
-	private parseIncomingOrder(order: any): TradingBotOrder {
+	private getFeeCurrency(order: AccountOrderV5 | WSAccountOrderV5): string {
+		const isMakerOrder = order.orderType === 'Limit';
+
+		if (isMakerOrder) {
+			return order.side === 'Buy'
+				? this.config.quoteCurrency
+				: this.config.baseCurrency;
+		} else {
+			return order.side === 'Buy'
+				? this.config.baseCurrency
+				: this.config.quoteCurrency;
+		}
+	}
+
+	private parseIncomingOrder(
+		order: WSAccountOrderV5 | AccountOrderV5,
+	): TradingBotOrder {
 		return {
 			id: order.orderId,
 			avgPrice: Number(order.avgPrice),
 			customId: order.orderLinkId,
 			fee: Number(order.cumExecFee),
-			feeCurrency: order.feeCurrency,
+			feeCurrency:
+				(order as WSAccountOrderV5).feeCurrency ||
+				this.getFeeCurrency(order),
 			quantity: Number(order.qty),
 			side: order.side === 'Buy' ? OrderSide.BUY : OrderSide.SELL,
 			symbol: order.symbol || this.symbol,
@@ -266,6 +286,49 @@ export class BybitSpotReverseGridBot extends BaseReverseGridBot {
 				};
 			},
 		});
+	}
+
+	protected async getLastFilledOrders(
+		count: number,
+	): Promise<TradingBotOrder[]> {
+		try {
+			const res = await retryWithFallback(
+				() =>
+					this.restClient.getHistoricOrders({
+						category: 'spot',
+						symbol: this.symbol,
+						limit: count,
+						orderStatus: 'Filled',
+					}),
+				{
+					attempts: 3,
+					delay: 800,
+					checkIfSuccess(res) {
+						return {
+							success: res.retCode === 0,
+							message: res.retMsg,
+						};
+					},
+				},
+			);
+
+			if (res.ok) {
+				if (res.data.result?.list) {
+					return res.data.result.list.map((order: AccountOrderV5) =>
+						this.parseIncomingOrder(order),
+					);
+				}
+			}
+
+			if (!res.ok) throw new Error(res.message);
+
+			this.logger.error('Failed to fetch last filled orders', res);
+			throw new Error('Failed to fetch last filled orders');
+		} catch (err) {
+			this.logger.error('Failed to fetch last filled orders', err);
+
+			return [];
+		}
 	}
 
 	protected async getTickerPrice(ticker: string): Promise<number> {

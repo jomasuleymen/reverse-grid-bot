@@ -19,11 +19,17 @@ import LoggerService from '@/infrastructure/services/logger/logger.service';
 import { FallbackResult } from '@/infrastructure/utils/request.utils';
 import { calculatePositionsSummary } from '@/infrastructure/utils/trading-orders.util';
 import { BadRequestException, Inject, Injectable, Scope } from '@nestjs/common';
+import { Mutex } from 'async-mutex';
 import { generateNewOrderId } from 'binance';
 import sleep from 'sleep-promise';
 import { TradingBotEntity } from '../../entities/trading-bots.entity';
 
 type TradingBotState = BotState.Idle | BotState.Running | BotState.Stopped;
+type CustomOrderIdPayload = {
+	type: OrderCreationType;
+	price: number;
+	handled: boolean;
+};
 
 @Injectable({ scope: Scope.TRANSIENT })
 export abstract class BaseReverseGridBot implements ITradingBot {
@@ -66,13 +72,11 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 	private TRIGGER_SIDE: OrderSide = OrderSide.BUY;
 	private STOP_LOSS_SIDE: OrderSide = OrderSide.SELL;
 
-	private customOrderIdsMap: Record<
-		string,
-		{ type: OrderCreationType; price: number }
-	> = {};
+	private customOrderIdsMap: Record<string, CustomOrderIdPayload> = {};
 
 	private isMadeFirstOrder: boolean = false;
 	private isCleanedUp: boolean = false;
+	private handleOrderMutex: Mutex;
 
 	public async start(options: IStartReverseBotOptions): Promise<void> {
 		this.config = options.config;
@@ -83,6 +87,8 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 			options.config.baseCurrency,
 			options.config.quoteCurrency,
 		);
+
+		this.handleOrderMutex = new Mutex();
 
 		if (this.config.position === TradePosition.SHORT) {
 			this.TRIGGER_SIDE = OrderSide.SELL;
@@ -118,6 +124,7 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 
 		this.checkBotState();
 		this.checkMissedTriggers();
+		this.checkForLastFilledOrders();
 	}
 
 	protected async successInit() {
@@ -229,27 +236,30 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		this.customOrderIdsMap[customOrderId] = {
 			price,
 			type,
+			handled: false,
 		};
 		return customOrderId;
 	}
 
-	protected parseCustomOrderId(
+	protected getCustomOrderIdPayload(
 		orderId: string,
-	): { type: OrderCreationType; price: number } | null {
+	): CustomOrderIdPayload | null {
 		if (!orderId) return null;
 
-		const data = this.customOrderIdsMap[orderId];
-		if (!data) return null;
-
-		return {
-			type: data.type,
-			price: data.price,
-		};
+		return this.customOrderIdsMap[orderId] || null;
 	}
 
 	protected async handleNewFilledOrder(order: TradingBotOrder) {
-		const orderInfo = this.parseCustomOrderId(order.customId);
-		if (!orderInfo) return;
+		const release = await this.handleOrderMutex.acquire();
+		const orderInfo = this.customOrderIdsMap[order.customId];
+
+		try {
+			if (!orderInfo || orderInfo.handled) return;
+
+			orderInfo.handled = true;
+		} finally {
+			release();
+		}
 
 		let { type, price: triggerPrice } = orderInfo;
 
@@ -544,6 +554,38 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		return buyCount - sellCount;
 	}
 
+	private async checkForLastFilledOrders() {
+		while (this.state !== BotState.Stopped) {
+			const lastFilledOrders = await this.getLastFilledOrders(5).catch(
+				() => [],
+			);
+
+			if (lastFilledOrders.length) {
+				for (const order of lastFilledOrders) {
+					const customOrderPayload = this.getCustomOrderIdPayload(
+						order.customId,
+					);
+
+					if (
+						customOrderPayload &&
+						customOrderPayload.handled === false
+					) {
+						try {
+							await this.handleNewFilledOrder(order);
+						} catch (err) {
+							this.logger.error(
+								'Error while handling last filled order',
+								{ order, error: err },
+							);
+						}
+					}
+				}
+			}
+
+			await sleep(1000);
+		}
+	}
+
 	private async checkMissedTriggers() {
 		while (this.state === BotState.Idle) {
 			await sleep(100);
@@ -715,4 +757,8 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		baseCurrency: string,
 		quoteCurrency: string,
 	): string;
+
+	protected abstract getLastFilledOrders(
+		count: number,
+	): Promise<TradingBotOrder[]>;
 }

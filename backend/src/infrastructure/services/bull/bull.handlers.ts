@@ -1,5 +1,6 @@
 import {
 	OnQueueActive,
+	OnQueueCompleted,
 	OnQueueError,
 	OnQueueFailed,
 	OnQueueRemoved,
@@ -47,6 +48,15 @@ export class DefaultBullHandlers {
 	@OnQueueActive()
 	active(job: Job) {
 		this.logger.info(`Task started`, {
+			queue: job.queue.name,
+			jobId: job.id,
+			data: job.data,
+		});
+	}
+
+	@OnQueueCompleted()
+	complete(job: Job) {
+		this.logger.info(`Task completed`, {
 			queue: job.queue.name,
 			jobId: job.id,
 			data: job.data,

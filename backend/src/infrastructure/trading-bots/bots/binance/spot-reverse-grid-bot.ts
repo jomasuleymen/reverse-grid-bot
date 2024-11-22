@@ -214,4 +214,8 @@ export class BinanceSpotReverseGridBot extends BaseReverseGridBot {
 	protected getSymbol(baseCurrency: string, quoteCurrency: string): string {
 		return baseCurrency + quoteCurrency;
 	}
+
+	protected async getLastFilledOrders(count: number): Promise<TradingBotOrder[]> {
+		return [];
+	}
 }
