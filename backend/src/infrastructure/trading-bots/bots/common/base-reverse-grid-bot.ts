@@ -218,12 +218,12 @@ export abstract class BaseReverseGridBot implements ITradingBot {
 		if (this.isCleanedUp) return;
 		this.isCleanedUp = true;
 
-		this.callBacks.onStateUpdate(BotState.Stopped, {
-			snapshots: this.snapshots,
+		await this.cleanUpImpl().catch((err) => {
+			this.logger.error('Error while cleaning up', err);
 		});
 
-		this.cleanUpImpl().catch((err) => {
-			this.logger.error('Error while cleaning up', err);
+		await this.callBacks.onStateUpdate(BotState.Stopped, {
+			snapshots: this.snapshots,
 		});
 	}
 
