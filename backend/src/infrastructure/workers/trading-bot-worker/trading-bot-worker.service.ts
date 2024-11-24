@@ -154,6 +154,10 @@ export class TradingBotWorkerService {
 									stopReason:
 										stoppedReason || 'Неизвестная ошибка',
 								});
+
+								setTimeout(() => {
+									process.exit(5223);
+								}, 5000);
 							}
 						},
 
@@ -219,6 +223,10 @@ export class TradingBotWorkerService {
 						stoppedAt: new Date(),
 						stopReason: err.message || 'Ошибка при запуска',
 					});
+
+					setTimeout(() => {
+						process.exit(5222);
+					}, 5000);
 				});
 		} catch (err: any) {
 			await this.tradingBotService.update(botId, {
