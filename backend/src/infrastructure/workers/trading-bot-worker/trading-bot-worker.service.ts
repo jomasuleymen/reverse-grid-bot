@@ -47,8 +47,12 @@ export class TradingBotWorkerService {
 			);
 			let foundProxy: IProxy | undefined;
 
-			// the state of current bot is idle, so we don't count it
-			if (runningBots.length > 1) {
+			const botsWithoutProxy = runningBots.filter(
+				(bot) => !bot.proxyId && bot.id !== botId,
+			);
+
+			// if there are bots without proxy, we need to find one
+			if (botsWithoutProxy.length) {
 				const proxies = await readProxies();
 
 				if (!proxies?.length) {
@@ -61,7 +65,7 @@ export class TradingBotWorkerService {
 				);
 
 				if (!foundProxy) {
-					throw new BadRequestException('Нет доступных прокси');
+					throw new BadRequestException('Все прокси используется');
 				}
 
 				await this.tradingBotService.update(botId, {
