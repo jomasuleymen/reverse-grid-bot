@@ -53,13 +53,4 @@ export class DefaultBullHandlers {
 			data: job.data,
 		});
 	}
-
-	@OnQueueCompleted()
-	complete(job: Job) {
-		this.logger.info(`Task completed`, {
-			queue: job.queue.name,
-			jobId: job.id,
-			data: job.data,
-		});
-	}
 }

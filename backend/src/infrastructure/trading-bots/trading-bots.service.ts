@@ -16,7 +16,6 @@ import { Queue } from 'bull';
 import { Equal, FindOptionsWhere, Not, Or, Repository } from 'typeorm';
 import { ExchangeCredentialsService } from '../exchanges/exchange-credentials/exchange-credentials.service';
 import { QUEUES } from '../services/bull/bull.const';
-import { BinanceSpotReverseGridBot } from './bots/binance/spot-reverse-grid-bot';
 import { BybitSpotReverseGridBot } from './bots/bybit/spot-reverse-grid-bot';
 import { GetTradingBotsDto } from './dto/get-bots.dto';
 import { StartBotDto } from './dto/start-bot.dto';
@@ -40,7 +39,6 @@ export class TradingBotService {
 			userId,
 			options.credentialsId,
 		);
-
 		const botEntity = await this.save({
 			userId: userId,
 			credentialsId: credentials.id,
@@ -58,7 +56,6 @@ export class TradingBotService {
 			tradeOnStart: options.tradeOnStart,
 			takeProfitOnPnl: options.takeProfitOnPnl,
 		});
-
 		await this.tradingBotStartQueue.add(
 			{
 				botId: botEntity.id,
@@ -166,8 +163,6 @@ export class TradingBotService {
 		switch (exchange) {
 			case ExchangeEnum.Bybit:
 				return await this.moduleRef.resolve(BybitSpotReverseGridBot);
-			case ExchangeEnum.Binance:
-				return await this.moduleRef.resolve(BinanceSpotReverseGridBot);
 			default:
 				throw new Error('Биржа не поддерживается');
 		}

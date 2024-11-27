@@ -3,7 +3,7 @@ import { TelegramPreferencesService } from '@/infrastructure/notification/telegr
 import { UserService } from '@/infrastructure/user/user.service';
 import { Injectable } from '@nestjs/common';
 import TelegramBot, { Message } from 'node-telegram-bot-api';
-import TelegramService from '../../telegram.service';
+import TelegramService from '../../telegram-bot.service';
 
 @Injectable()
 class ConnectToAccountCommand extends IBotCommand {
@@ -51,7 +51,13 @@ class ConnectToAccountCommand extends IBotCommand {
 					if (!user) {
 						bot.sendMessage(chatId, 'Пользователь не найден!');
 					} else {
+						const preferences =
+							await this.telegramPreferencesService.findByUserId(
+								user.id,
+							);
+
 						await this.telegramPreferencesService.save({
+							id: preferences?.id,
 							chatId: msg.chat?.id,
 							firstName: msg.from?.first_name,
 							telegramUserId: msg.from?.id,

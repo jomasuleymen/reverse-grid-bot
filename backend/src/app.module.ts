@@ -17,11 +17,14 @@ import { AuthModule } from './infrastructure/auth/auth.module';
 import { ExchangesModule } from './infrastructure/exchanges/exchanges.module';
 import { BullServiceModule } from './infrastructure/services/bull/bull.module';
 import { CustomLoggerModule } from './infrastructure/services/logger/logger.module';
+import { TelegramBotModule } from './infrastructure/services/telegram/telegram-bot/telegram-bot.module';
 import { TelegramModule } from './infrastructure/services/telegram/telegram.module';
 import { SessionModule } from './infrastructure/session/session.module';
 import { SessionService } from './infrastructure/session/session.service';
 import { TradingBotModule } from './infrastructure/trading-bots/trading-bots.module';
 import { TradingServicesModule } from './infrastructure/trading-services/trading-services.module';
+import { WorkersModule } from './infrastructure/workers/worker.module';
+import { isInitTypeEnv, TYPE_ENV } from './init';
 
 @Module({
 	imports: [
@@ -59,6 +62,9 @@ import { TradingServicesModule } from './infrastructure/trading-services/trading
 
 		TelegramModule,
 		BackgroundModule,
+		WorkersModule,
+
+		...(isInitTypeEnv(TYPE_ENV.FACE) ? [TelegramBotModule] : []),
 	],
 	controllers: [],
 	providers: [],

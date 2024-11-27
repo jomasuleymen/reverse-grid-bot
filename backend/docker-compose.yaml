@@ -6,19 +6,9 @@ services:
         ports:
             - '${REDIS_PORT:-6379}:6379'
         command: >
-            --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is not specified} 
-            --bind 0.0.0.0 
-            --protected-mode yes
+            --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is not specified}
         volumes:
             - redis_data:/data
-        networks:
-            internal_net:
-                aliases:
-                    - redis
-
-networks:
-    internal_net:
-        driver: bridge
 
 volumes:
     redis_data: {}
