@@ -103,7 +103,6 @@ const StartBotSimulatorModal: React.FC = () => {
         title="Создание симулятора"
         open={isModalOpen}
         onCancel={handleCancel}
-        onClose={handleCancel}
         footer={null}
         centered
       >

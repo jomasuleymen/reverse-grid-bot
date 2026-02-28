@@ -181,7 +181,6 @@ const StartBotModal: React.FC = () => {
         title="Запустить бота"
         open={isModalOpen}
         onCancel={handleCancel}
-        onClose={handleCancel}
         footer={null}
         centered
       >

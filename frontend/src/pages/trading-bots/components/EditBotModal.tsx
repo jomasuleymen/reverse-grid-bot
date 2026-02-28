@@ -128,7 +128,6 @@ const EditBotModal: React.FC<Props> = ({ botId }) => {
         title="Изменить бота"
         open={isModalOpen}
         onCancel={handleCancel}
-        onClose={handleCancel}
         footer={null}
         centered
       >
